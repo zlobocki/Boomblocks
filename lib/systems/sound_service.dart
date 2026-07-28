@@ -20,17 +20,19 @@ class SoundService {
     }
   }
 
-  Future<void> playClear({required bool highScore}) async {
+  Future<void> _play(String asset) async {
     await init();
     try {
       await _player.stop();
-      await _player.play(
-        AssetSource(
-          highScore ? 'sounds/great_success.mp3' : 'sounds/success.mp3',
-        ),
-      );
+      await _player.play(AssetSource(asset));
     } catch (e) {
       debugPrint('Sound play failed: $e');
     }
   }
+
+  Future<void> playClear({required bool highScore}) => _play(
+        highScore ? 'sounds/great_success.mp3' : 'sounds/success.mp3',
+      );
+
+  Future<void> playSadClear() => _play('sounds/sad.mp3');
 }

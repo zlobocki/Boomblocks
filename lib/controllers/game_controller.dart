@@ -156,11 +156,17 @@ class GameController extends ChangeNotifier {
   }
 
   void _handleClearResult(ClearResult clear) {
-    if (clear.linesCleared > 0 || clear.collectedGems.isNotEmpty) {
-      final high = clear.score >= highScoreClearThreshold ||
-          clear.linesCleared >= 2 ||
-          clear.collectedGems.any((g) => g.points >= 25);
-      SoundService.instance.playClear(highScore: high);
+    final didClear =
+        clear.linesCleared > 0 || clear.clearedCells.isNotEmpty;
+    if (didClear) {
+      if (clear.score <= 0) {
+        SoundService.instance.playSadClear();
+      } else {
+        final high = clear.score >= highScoreClearThreshold ||
+            clear.linesCleared >= 2 ||
+            clear.collectedGems.any((g) => g.points >= 25);
+        SoundService.instance.playClear(highScore: high);
+      }
     }
 
     if (clear.collectedGems.isNotEmpty) {
