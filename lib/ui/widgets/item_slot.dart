@@ -8,7 +8,7 @@ class ItemSlot extends StatelessWidget {
   const ItemSlot({
     super.key,
     required this.label,
-    required this.icon,
+    required this.assetPath,
     required this.meter,
     required this.accent,
     required this.onDragStarted,
@@ -18,7 +18,7 @@ class ItemSlot extends StatelessWidget {
   });
 
   final String label;
-  final IconData icon;
+  final String assetPath;
   final ItemMeter meter;
   final Color accent;
   final VoidCallback onDragStarted;
@@ -38,12 +38,13 @@ class ItemSlot extends StatelessWidget {
             LongPressDraggable<String>(
               data: label.toLowerCase(),
               maxSimultaneousDrags: canDrag ? 1 : 0,
+              dragAnchorStrategy: pointerDragAnchorStrategy,
               onDragStarted: onDragStarted,
               onDragEnd: (_) => onDragEnded(),
               feedback: Material(
                 color: Colors.transparent,
                 child: _IconBadge(
-                  icon: icon,
+                  assetPath: assetPath,
                   accent: accent,
                   count: meter.count,
                   dragging: true,
@@ -51,10 +52,14 @@ class ItemSlot extends StatelessWidget {
               ),
               childWhenDragging: Opacity(
                 opacity: 0.35,
-                child: _IconBadge(icon: icon, accent: accent, count: meter.count),
+                child: _IconBadge(
+                  assetPath: assetPath,
+                  accent: accent,
+                  count: meter.count,
+                ),
               ),
               child: _IconBadge(
-                icon: icon,
+                assetPath: assetPath,
                 accent: accent,
                 count: meter.count,
                 dimmed: !canDrag,
@@ -64,13 +69,13 @@ class ItemSlot extends StatelessWidget {
               Positioned(
                 top: -10,
                 right: -8,
-                child: _MaxBadge(),
+                child: const _MaxBadge(),
               ),
           ],
         ),
         const SizedBox(height: 6),
         SizedBox(
-          width: 64,
+          width: 72,
           child: Column(
             children: [
               Text(
@@ -110,14 +115,14 @@ class ItemSlot extends StatelessWidget {
 
 class _IconBadge extends StatelessWidget {
   const _IconBadge({
-    required this.icon,
+    required this.assetPath,
     required this.accent,
     required this.count,
     this.dragging = false,
     this.dimmed = false,
   });
 
-  final IconData icon;
+  final String assetPath;
   final Color accent;
   final int count;
   final bool dragging;
@@ -125,39 +130,36 @@ class _IconBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = dragging ? 72.0 : 60.0;
     return Opacity(
       opacity: dimmed ? 0.45 : 1,
-      child: Container(
-        width: dragging ? 64 : 56,
-        height: dragging ? 64 : 56,
-        decoration: BoxDecoration(
-          color: BoomColors.tray,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: accent, width: 2.5),
-          boxShadow: [
-            BoxShadow(
-              color: accent.withValues(alpha: 0.25),
-              blurRadius: dragging ? 12 : 6,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
+      child: SizedBox(
+        width: size,
+        height: size,
         child: Stack(
+          clipBehavior: Clip.none,
           children: [
-            Center(child: Icon(icon, color: accent, size: 28)),
+            Positioned.fill(
+              child: Image.asset(
+                assetPath,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.medium,
+              ),
+            ),
             Positioned(
-              right: 4,
-              top: 4,
+              right: 0,
+              top: 0,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
                   color: accent,
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white, width: 1.5),
                 ),
                 child: Text(
                   '$count',
                   style: GoogleFonts.nunito(
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
                   ),
@@ -172,12 +174,15 @@ class _IconBadge extends StatelessWidget {
 }
 
 class _MaxBadge extends StatelessWidget {
+  const _MaxBadge();
+
   @override
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.6, end: 1),
       duration: const Duration(milliseconds: 350),
-      builder: (context, value, child) => Transform.scale(scale: value, child: child),
+      builder: (context, value, child) =>
+          Transform.scale(scale: value, child: child),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(

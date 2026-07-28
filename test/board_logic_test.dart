@@ -24,13 +24,13 @@ void main() {
       for (var c = 0; c < 8; c++) {
         board[0][c].placeEarth();
       }
-      board[0][0].setGem(GemType.gold); // 10
-      board[0][1].setGem(GemType.coal); // 1
+      board[0][0].setGem(GemType.gold);
+      board[0][1].setGem(GemType.coal);
       final result = BoardLogic.clearCompletedLines(board);
       expect(result.rowsCleared, 1);
       expect(result.colsCleared, 0);
       expect(result.gemValueSum, 11);
-      expect(result.score, 11); // 1 line × 11
+      expect(result.score, 11);
       expect(board[0].every((c) => !c.filled), isTrue);
     });
 
@@ -40,8 +40,8 @@ void main() {
         board[0][c].placeEarth();
         board[1][c].placeEarth();
       }
-      board[0][0].setGem(GemType.silver); // 5
-      board[1][0].setGem(GemType.silver); // 5
+      board[0][0].setGem(GemType.silver);
+      board[1][0].setGem(GemType.silver);
       final result = BoardLogic.clearCompletedLines(board);
       expect(result.linesCleared, 2);
       expect(result.gemValueSum, 10);
@@ -55,16 +55,15 @@ void main() {
           board[r][c].placeEarth();
         }
       }
-      board[1][1].setGem(GemType.ruby); // 25
+      board[1][1].setGem(GemType.ruby);
       final result = BoardLogic.clearDynamite(board, 1, 1);
       expect(result.gemValueSum, 25);
-      expect(result.score, 25); // no lines → mult 1
+      expect(result.score, 25);
       expect(board[1][1].filled, isFalse);
     });
 
     test('rope allows checking all rotations for placeability', () {
       final board = BoardLogic.emptyBoard();
-      // Fill almost everything leaving a vertical 4-gap in col 0
       for (var r = 0; r < 8; r++) {
         for (var c = 0; c < 8; c++) {
           if (c == 0 && r < 4) continue;
@@ -84,6 +83,27 @@ void main() {
         hasRope: true,
       );
       expect(BoardLogic.canPlaceAnywhere(board, withRope), isTrue);
+    });
+
+    test('3x3 square and big L orientations have expected sizes', () {
+      expect(PieceCatalog.square3.cells.length, 9);
+      expect(PieceCatalog.square3.width, 3);
+      expect(PieceCatalog.square3.height, 3);
+      for (final l in PieceCatalog.bigLAll) {
+        expect(l.cells.length, 5);
+        expect(l.width, 3);
+        expect(l.height, 3);
+      }
+    });
+
+    test('prefill populates board without completing lines', () {
+      final board = BoardLogic.emptyBoard();
+      BoardLogic.prefillBoard(board, targetCells: 20, random: Random(1));
+      expect(BoardLogic.filledCount(board), greaterThan(10));
+      expect(BoardLogic.isEmpty(board), isFalse);
+      for (var r = 0; r < 8; r++) {
+        expect(board[r].every((c) => c.filled), isFalse);
+      }
     });
   });
 
@@ -117,8 +137,7 @@ void main() {
 
   group('BoardCell', () {
     test('json roundtrip', () {
-      final cell = BoardCell(filled: true)
-        ..setGem(GemType.diamond, rounds: 2);
+      final cell = BoardCell(filled: true)..setGem(GemType.diamond, rounds: 2);
       final copy = BoardCell.fromJson(cell.toJson());
       expect(copy.filled, isTrue);
       expect(copy.gem, GemType.diamond);

@@ -141,6 +141,47 @@ class PieceCatalog {
     const Point(2, 1),
   ]);
 
+  /// Full 3×3 square (9 cells).
+  static final square3 = PieceShape('square3', [
+    for (var y = 0; y < 3; y++)
+      for (var x = 0; x < 3; x++) Point<int>(x, y),
+  ]);
+
+  /// 3×3-bounded L pentomino (5 cells) — base orientation.
+  static final bigL0 = PieceShape('bigL0', [
+    const Point(0, 0),
+    const Point(0, 1),
+    const Point(0, 2),
+    const Point(1, 2),
+    const Point(2, 2),
+  ]);
+
+  static final bigL1 = PieceShape('bigL1', [
+    const Point(0, 0),
+    const Point(1, 0),
+    const Point(2, 0),
+    const Point(0, 1),
+    const Point(0, 2),
+  ]);
+
+  static final bigL2 = PieceShape('bigL2', [
+    const Point(0, 0),
+    const Point(1, 0),
+    const Point(2, 0),
+    const Point(2, 1),
+    const Point(2, 2),
+  ]);
+
+  static final bigL3 = PieceShape('bigL3', [
+    const Point(2, 0),
+    const Point(2, 1),
+    const Point(0, 2),
+    const Point(1, 2),
+    const Point(2, 2),
+  ]);
+
+  static List<PieceShape> get bigLAll => [bigL0, bigL1, bigL2, bigL3];
+
   static List<PieceShape> get easy => [
         monomino,
         dominoH,
@@ -149,6 +190,8 @@ class PieceCatalog {
         tetrominoO,
         tetrominoI,
         tetrominoT,
+        bigL0,
+        bigL1,
       ];
 
   static List<PieceShape> get medium => [
@@ -159,6 +202,8 @@ class PieceCatalog {
         tetrominoT,
         tetrominoL,
         tetrominoJ,
+        square3,
+        ...bigLAll,
       ];
 
   static List<PieceShape> get hard => [
@@ -168,7 +213,9 @@ class PieceCatalog {
         tetrominoJ,
         tetrominoS,
         tetrominoZ,
-        tetrominoS,
-        tetrominoZ,
+        square3,
+        square3,
+        ...bigLAll,
+        ...bigLAll,
       ];
 }

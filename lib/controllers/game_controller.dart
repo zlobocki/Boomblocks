@@ -11,13 +11,6 @@ import '../systems/piece_generator.dart';
 
 enum GameStatus { playing, gameOver }
 
-enum DragItemKind { piece, rope, dynamite }
-
-class ScorePopup {
-  ScorePopup(this.text);
-  final String text;
-}
-
 class GameController extends ChangeNotifier {
   GameController({GameStorage? storage}) : _storage = storage ?? GameStorage();
 
@@ -33,9 +26,11 @@ class GameController extends ChangeNotifier {
   int difficultyLevel = 1;
   int piecesPlacedThisRound = 0;
   GameStatus status = GameStatus.playing;
-  String? maxToast; // "MAX" feedback
+  String? maxToast;
   String? lastScoreToast;
   bool loaded = false;
+
+  static const clearBoardBonusBase = 250;
 
   Future<void> init({bool forceNew = false}) async {
     if (!forceNew) {
@@ -60,10 +55,16 @@ class GameController extends ChangeNotifier {
     status = GameStatus.playing;
     maxToast = null;
     lastScoreToast = null;
+    _seedBoard();
     _dealTray();
     loaded = true;
     _persist();
     notifyListeners();
+  }
+
+  void _seedBoard() {
+    BoardLogic.prefillBoard(board, targetCells: 20 + difficultyLevel * 2);
+    _gems.spawnWave(board, difficultyLevel);
   }
 
   void _dealTray() {
@@ -114,6 +115,7 @@ class GameController extends ChangeNotifier {
 
     final clear = BoardLogic.clearCompletedLines(board);
     _applyScore(clear.score, clear.linesCleared, clear.gemValueSum);
+    _handleClearBoardBonus();
 
     if (piecesPlacedThisRound >= 3 || tray.every((p) => p == null)) {
       _endRound();
@@ -132,10 +134,22 @@ class GameController extends ChangeNotifier {
 
     final result = BoardLogic.clearDynamite(board, row, col);
     _applyScore(result.score, result.linesCleared, result.gemValueSum);
+    _handleClearBoardBonus();
     _checkGameOver();
     _persist();
     notifyListeners();
     return true;
+  }
+
+  void _handleClearBoardBonus() {
+    if (!BoardLogic.isEmpty(board)) return;
+    final bonus = clearBoardBonusBase * difficultyLevel;
+    score += bonus;
+    lastScoreToast = 'BOARD CLEAR! +$bonus';
+    final ropeMax = inventory.rope.addScore(bonus);
+    final dynMax = inventory.dynamite.addScore(bonus);
+    if (ropeMax || dynMax) maxToast = 'MAX';
+    _seedBoard();
   }
 
   void _applyScore(int gained, int lines, int gemSum) {
@@ -153,7 +167,6 @@ class GameController extends ChangeNotifier {
   }
 
   void _endRound() {
-    // Difficulty: every 5 rounds
     if (round % 5 == 0) {
       difficultyLevel++;
     }

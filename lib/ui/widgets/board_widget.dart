@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../models/cell.dart';
-import '../../models/gem.dart';
 import '../../models/piece.dart';
 import '../../systems/board_logic.dart';
 import '../../theme/app_theme.dart';
+import '../../theme/game_assets.dart';
 
 class BoardWidget extends StatelessWidget {
   const BoardWidget({
@@ -15,8 +15,8 @@ class BoardWidget extends StatelessWidget {
     this.previewRow,
     this.previewCol,
     this.previewValid = false,
-    this.dynamiteHover,
-    this.onCellTap,
+    this.dynamiteHoverRow,
+    this.dynamiteHoverCol,
   });
 
   final List<List<BoardCell>> board;
@@ -25,8 +25,8 @@ class BoardWidget extends StatelessWidget {
   final int? previewRow;
   final int? previewCol;
   final bool previewValid;
-  final Offset? dynamiteHover; // board-local
-  final void Function(int row, int col)? onCellTap;
+  final int? dynamiteHoverRow;
+  final int? dynamiteHoverCol;
 
   @override
   Widget build(BuildContext context) {
@@ -51,31 +51,37 @@ class BoardWidget extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: GestureDetector(
-          onTapUp: onCellTap == null
-              ? null
-              : (d) {
-                  final c = (d.localPosition.dx / cellSize).floor();
-                  final r = (d.localPosition.dy / cellSize).floor();
-                  if (r >= 0 &&
-                      r < BoardLogic.size &&
-                      c >= 0 &&
-                      c < BoardLogic.size) {
-                    onCellTap!(r, c);
-                  }
-                },
-          child: CustomPaint(
-            size: Size(side, side),
-            painter: _BoardPainter(
-              board: board,
-              cellSize: cellSize,
-              previewShape: previewShape,
-              previewRow: previewRow,
-              previewCol: previewCol,
-              previewValid: previewValid,
-              dynamiteHover: dynamiteHover,
+        child: Stack(
+          children: [
+            CustomPaint(
+              size: Size(side, side),
+              painter: _BoardPainter(
+                board: board,
+                cellSize: cellSize,
+                previewShape: previewShape,
+                previewRow: previewRow,
+                previewCol: previewCol,
+                previewValid: previewValid,
+                dynamiteHoverRow: dynamiteHoverRow,
+                dynamiteHoverCol: dynamiteHoverCol,
+              ),
             ),
-          ),
+            for (var r = 0; r < BoardLogic.size; r++)
+              for (var c = 0; c < BoardLogic.size; c++)
+                if (board[r][c].hasGem)
+                  Positioned(
+                    left: c * cellSize + cellSize * 0.12,
+                    top: r * cellSize + cellSize * 0.12,
+                    width: cellSize * 0.76,
+                    height: cellSize * 0.76,
+                    child: Image.asset(
+                      GameAssets.gem(board[r][c].gem!.name),
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.medium,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  ),
+          ],
         ),
       ),
     );
@@ -90,7 +96,8 @@ class _BoardPainter extends CustomPainter {
     this.previewRow,
     this.previewCol,
     this.previewValid = false,
-    this.dynamiteHover,
+    this.dynamiteHoverRow,
+    this.dynamiteHoverCol,
   });
 
   final List<List<BoardCell>> board;
@@ -99,7 +106,8 @@ class _BoardPainter extends CustomPainter {
   final int? previewRow;
   final int? previewCol;
   final bool previewValid;
-  final Offset? dynamiteHover;
+  final int? dynamiteHoverRow;
+  final int? dynamiteHoverCol;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -115,9 +123,8 @@ class _BoardPainter extends CustomPainter {
 
     for (var r = 0; r < BoardLogic.size; r++) {
       for (var c = 0; c < BoardLogic.size; c++) {
-        final cell = board[r][c];
-        if (!cell.filled) continue;
-        _drawEarth(canvas, c * cellSize, r * cellSize, cell);
+        if (!board[r][c].filled) continue;
+        _drawEarth(canvas, c * cellSize, r * cellSize);
       }
     }
 
@@ -139,14 +146,17 @@ class _BoardPainter extends CustomPainter {
       }
     }
 
-    if (dynamiteHover != null) {
-      final c = (dynamiteHover!.dx / cellSize).floor();
-      final r = (dynamiteHover!.dy / cellSize).floor();
+    if (dynamiteHoverRow != null && dynamiteHoverCol != null) {
       final paint = Paint()
         ..color = BoomColors.dynamite.withValues(alpha: 0.35);
+      final r = dynamiteHoverRow!;
+      final c = dynamiteHoverCol!;
       for (var rr = r - 1; rr <= r + 1; rr++) {
         for (var cc = c - 1; cc <= c + 1; cc++) {
-          if (rr < 0 || rr >= BoardLogic.size || cc < 0 || cc >= BoardLogic.size) {
+          if (rr < 0 ||
+              rr >= BoardLogic.size ||
+              cc < 0 ||
+              cc >= BoardLogic.size) {
             continue;
           }
           canvas.drawRRect(
@@ -166,7 +176,7 @@ class _BoardPainter extends CustomPainter {
     }
   }
 
-  void _drawEarth(Canvas canvas, double x, double y, BoardCell cell) {
+  void _drawEarth(Canvas canvas, double x, double y) {
     final rect = RRect.fromRectAndRadius(
       Rect.fromLTWH(x + 2, y + 2, cellSize - 4, cellSize - 4),
       const Radius.circular(7),
@@ -179,41 +189,9 @@ class _BoardPainter extends CustomPainter {
       ).createShader(rect.outerRect);
     canvas.drawRRect(rect, paint);
 
-    // rock speckles
     final speck = Paint()..color = BoomColors.rock.withValues(alpha: 0.35);
     canvas.drawCircle(Offset(x + cellSize * 0.3, y + cellSize * 0.35), 2, speck);
     canvas.drawCircle(Offset(x + cellSize * 0.65, y + cellSize * 0.6), 1.5, speck);
-
-    if (cell.hasGem) {
-      _drawGem(canvas, x, y, cell.gem!);
-    }
-  }
-
-  void _drawGem(Canvas canvas, double x, double y, GemType gem) {
-    final cx = x + cellSize / 2;
-    final cy = y + cellSize / 2;
-    final color = switch (gem) {
-      GemType.coal => const Color(0xFF3A3A3A),
-      GemType.silver => const Color(0xFFC0C0C0),
-      GemType.gold => const Color(0xFFFFD700),
-      GemType.emerald => const Color(0xFF2ECC71),
-      GemType.ruby => const Color(0xFFE74C3C),
-      GemType.diamond => const Color(0xFF7FDBFF),
-    };
-    final path = Path()
-      ..moveTo(cx, cy - cellSize * 0.28)
-      ..lineTo(cx + cellSize * 0.22, cy)
-      ..lineTo(cx, cy + cellSize * 0.28)
-      ..lineTo(cx - cellSize * 0.22, cy)
-      ..close();
-    canvas.drawPath(path, Paint()..color = color);
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = Colors.white.withValues(alpha: 0.5)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.2,
-    );
   }
 
   @override
@@ -243,7 +221,12 @@ class PiecePreview extends StatelessWidget {
       width: w,
       height: h,
       child: CustomPaint(
-        painter: _PiecePainter(shape: shape, cellSize: cellSize, hasRope: hasRope, color: color),
+        painter: _PiecePainter(
+          shape: shape,
+          cellSize: cellSize,
+          hasRope: hasRope,
+          color: color,
+        ),
       ),
     );
   }
@@ -289,7 +272,6 @@ class _PiecePainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = 3,
         );
-        // rope dashes
         canvas.drawRRect(
           rect.deflate(3),
           Paint()

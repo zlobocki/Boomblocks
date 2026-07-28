@@ -178,4 +178,90 @@ class BoardLogic {
       clearedCells: [...cleared, ...followUp.clearedCells],
     );
   }
+
+  static bool isEmpty(List<List<BoardCell>> board) {
+    for (final row in board) {
+      for (final cell in row) {
+        if (cell.filled) return false;
+      }
+    }
+    return true;
+  }
+
+  static int filledCount(List<List<BoardCell>> board) {
+    var n = 0;
+    for (final row in board) {
+      for (final cell in row) {
+        if (cell.filled) n++;
+      }
+    }
+    return n;
+  }
+
+  /// Scatter earth blocks so the opening board is already a puzzle.
+  /// Never fills a complete row or column.
+  static void prefillBoard(
+    List<List<BoardCell>> board, {
+    int targetCells = 22,
+    Random? random,
+  }) {
+    final rng = random ?? Random();
+    final shapes = [
+      PieceCatalog.dominoH,
+      PieceCatalog.trominoI,
+      PieceCatalog.trominoL,
+      PieceCatalog.tetrominoO,
+      PieceCatalog.tetrominoT,
+      PieceCatalog.tetrominoL,
+      PieceCatalog.bigL0,
+    ];
+
+    var placed = 0;
+    var attempts = 0;
+    while (placed < targetCells && attempts < 200) {
+      attempts++;
+      final shape = shapes[rng.nextInt(shapes.length)];
+      var s = shape;
+      final turns = rng.nextInt(4);
+      for (var t = 0; t < turns; t++) {
+        s = s.rotated90();
+      }
+      final row = rng.nextInt(size);
+      final col = rng.nextInt(size);
+      if (!canPlace(board, s, row, col)) continue;
+
+      // Tentatively place, reject if it completes a line.
+      placePiece(board, s, row, col);
+      var completesLine = false;
+      for (var r = 0; r < size; r++) {
+        if (board[r].every((c) => c.filled)) {
+          completesLine = true;
+          break;
+        }
+      }
+      if (!completesLine) {
+        for (var c = 0; c < size; c++) {
+          var full = true;
+          for (var r = 0; r < size; r++) {
+            if (!board[r][c].filled) {
+              full = false;
+              break;
+            }
+          }
+          if (full) {
+            completesLine = true;
+            break;
+          }
+        }
+      }
+      if (completesLine) {
+        // Undo
+        for (final p in s.cells) {
+          board[row + p.y][col + p.x].clear();
+        }
+        continue;
+      }
+      placed += s.cells.length;
+    }
+  }
 }
