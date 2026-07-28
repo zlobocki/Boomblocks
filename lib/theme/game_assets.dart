@@ -8,6 +8,7 @@ class GameAssets {
   static const diamond = 'assets/images/diamond.png';
   static const rope = 'assets/images/rope.png';
   static const dynamite = 'assets/images/dynamite.png';
+  static const welcomeBg = 'assets/images/welcome_bg.jpg';
 
   static String gem(String gemName) => 'assets/images/$gemName.png';
 }

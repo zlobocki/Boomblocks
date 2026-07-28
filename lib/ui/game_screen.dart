@@ -394,7 +394,8 @@ class _GameScreenState extends State<GameScreen> {
                   GameHud(
                     score: c.score,
                     round: c.round,
-                    difficulty: c.difficultyLevel,
+                    lootProgress: c.gemsCollectedTowardReset,
+                    lootGoal: GameController.lootResetAt,
                     scoreToast: c.lastScoreToast,
                     onMenu: _openMenu,
                     scoreKey: _scoreKey,

@@ -5,6 +5,7 @@ import 'package:boomblocks/models/gem.dart';
 import 'package:boomblocks/models/inventory.dart';
 import 'package:boomblocks/models/piece.dart';
 import 'package:boomblocks/systems/board_logic.dart';
+import 'package:boomblocks/systems/gem_spawner.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -24,14 +25,27 @@ void main() {
       for (var c = 0; c < 8; c++) {
         board[0][c].placeEarth();
       }
-      board[0][0].setGem(GemType.gold);
-      board[0][1].setGem(GemType.coal);
+      board[0][0].setGem(GemType.gold); // 10
+      board[0][1].setGem(GemType.coal); // 0
       final result = BoardLogic.clearCompletedLines(board);
       expect(result.rowsCleared, 1);
       expect(result.colsCleared, 0);
-      expect(result.gemValueSum, 11);
-      expect(result.score, 11);
+      expect(result.gemValueSum, 10);
+      expect(result.score, 10);
+      expect(result.collectedGems.length, 2); // coal still counts as collected
       expect(board[0].every((c) => !c.filled), isTrue);
+    });
+
+    test('coal-only clear scores zero', () {
+      final board = BoardLogic.emptyBoard();
+      for (var c = 0; c < 8; c++) {
+        board[0][c].placeEarth();
+      }
+      board[0][0].setGem(GemType.coal);
+      board[0][1].setGem(GemType.coal);
+      final result = BoardLogic.clearCompletedLines(board);
+      expect(result.score, 0);
+      expect(result.collectedGems.length, 2);
     });
 
     test('multi-line clear multiplies gem value', () {
@@ -112,13 +126,13 @@ void main() {
         board[0][c].placeEarth();
         board[1][c].placeEarth();
       }
-      board[0][0].setGem(GemType.gold); // 10
-      board[1][3].setGem(GemType.coal); // 1
+      board[0][0].setGem(GemType.gold); // 10 → 20
+      board[1][3].setGem(GemType.silver); // 5 → 10
       final result = BoardLogic.clearCompletedLines(board);
       expect(result.linesCleared, 2);
       expect(result.collectedGems.length, 2);
-      expect(result.collectedGems.map((g) => g.points).toSet(), {20, 2});
-      expect(result.score, 22);
+      expect(result.collectedGems.map((g) => g.points).toSet(), {20, 10});
+      expect(result.score, 30);
     });
   });
 
@@ -157,6 +171,32 @@ void main() {
       expect(copy.filled, isTrue);
       expect(copy.gem, GemType.diamond);
       expect(copy.gemRoundsLeft, 2);
+    });
+  });
+
+  group('GemSpawner', () {
+    test('wave places at least 10 gems with half coal', () {
+      final board = BoardLogic.emptyBoard();
+      // Fill enough earth for a full wave
+      for (var r = 0; r < 8; r++) {
+        for (var c = 0; c < 8; c++) {
+          board[r][c].placeEarth();
+        }
+      }
+      final spawner = GemSpawner(Random(42));
+      final placed = spawner.spawnWave(board, 1);
+      expect(placed, greaterThanOrEqualTo(10));
+      var coal = 0;
+      var total = 0;
+      for (final row in board) {
+        for (final cell in row) {
+          if (!cell.hasGem) continue;
+          total++;
+          if (cell.gem == GemType.coal) coal++;
+        }
+      }
+      expect(total, placed);
+      expect(coal, placed ~/ 2);
     });
   });
 }

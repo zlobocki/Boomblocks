@@ -8,7 +8,8 @@ class GameHud extends StatelessWidget {
     super.key,
     required this.score,
     required this.round,
-    required this.difficulty,
+    required this.lootProgress,
+    required this.lootGoal,
     this.scoreToast,
     required this.onMenu,
     this.scoreKey,
@@ -16,7 +17,8 @@ class GameHud extends StatelessWidget {
 
   final int score;
   final int round;
-  final int difficulty;
+  final int lootProgress;
+  final int lootGoal;
   final String? scoreToast;
   final VoidCallback onMenu;
   final GlobalKey? scoreKey;
@@ -24,7 +26,7 @@ class GameHud extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
         children: [
           IconButton(
@@ -38,7 +40,7 @@ class GameHud extends StatelessWidget {
                 Text(
                   'BoomBlocks',
                   style: GoogleFonts.fredoka(
-                    fontSize: 26,
+                    fontSize: 24,
                     fontWeight: FontWeight.w600,
                     color: BoomColors.ink,
                   ),
@@ -49,7 +51,7 @@ class GameHud extends StatelessWidget {
                   child: Text(
                     scoreToast ?? ' ',
                     style: GoogleFonts.nunito(
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.w800,
                       color: BoomColors.success,
                     ),
@@ -62,7 +64,9 @@ class GameHud extends StatelessWidget {
             key: scoreKey,
             child: _StatChip(label: 'Cash', value: '\$$score'),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
+          _StatChip(label: 'Loot', value: '$lootProgress/$lootGoal'),
+          const SizedBox(width: 6),
           _StatChip(label: 'Rnd', value: '$round'),
         ],
       ),
@@ -78,7 +82,7 @@ class _StatChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         color: BoomColors.hud.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(12),
@@ -98,7 +102,7 @@ class _StatChip extends StatelessWidget {
           Text(
             value,
             style: GoogleFonts.nunito(
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: FontWeight.w800,
               color: BoomColors.ink,
             ),

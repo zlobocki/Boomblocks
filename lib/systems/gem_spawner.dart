@@ -9,13 +9,23 @@ class GemSpawner {
 
   final Random _rng;
 
-  /// Age gems by one round and remove expired ones.
-  void ageGems(List<List<BoardCell>> board) {
+  static const minWaveSize = 10;
+
+  int countGemsOnBoard(List<List<BoardCell>> board) {
+    var n = 0;
     for (final row in board) {
       for (final cell in row) {
-        if (!cell.hasGem) continue;
-        cell.gemRoundsLeft--;
-        if (cell.gemRoundsLeft <= 0) {
+        if (cell.hasGem) n++;
+      }
+    }
+    return n;
+  }
+
+  /// Remove every collectible currently on the board.
+  void clearAllGems(List<List<BoardCell>> board) {
+    for (final row in board) {
+      for (final cell in row) {
+        if (cell.hasGem) {
           cell.gem = null;
           cell.gemRoundsLeft = 0;
         }
@@ -23,8 +33,9 @@ class GemSpawner {
     }
   }
 
-  /// Spawn a fresh wave of gems on occupied earth cells without gems.
-  void spawnWave(List<List<BoardCell>> board, int difficultyLevel) {
+  /// Spawn a wave: at least [minWaveSize] items when possible, half coal.
+  /// Returns how many gems were placed.
+  int spawnWave(List<List<BoardCell>> board, int difficultyLevel) {
     final candidates = <Point<int>>[];
     for (var r = 0; r < BoardLogic.size; r++) {
       for (var c = 0; c < BoardLogic.size; c++) {
@@ -34,63 +45,49 @@ class GemSpawner {
         }
       }
     }
-    if (candidates.isEmpty) return;
+    if (candidates.isEmpty) return 0;
 
     candidates.shuffle(_rng);
-    final count = _spawnCount(difficultyLevel, candidates.length);
-    for (var i = 0; i < count; i++) {
+    final placeCount = min(candidates.length, max(minWaveSize, 10));
+
+    final types = _buildWaveTypes(placeCount, difficultyLevel);
+    for (var i = 0; i < placeCount; i++) {
       final p = candidates[i];
-      board[p.y][p.x].setGem(_pickGem(difficultyLevel), rounds: 2);
+      board[p.y][p.x].setGem(types[i], rounds: 99);
     }
+    return placeCount;
   }
 
-  /// Called at end of each round: age existing, then top-up / refresh.
-  void onRoundEnd(List<List<BoardCell>> board, int difficultyLevel, int round) {
-    ageGems(board);
-    // Every 2 rounds, also force-refresh remaining gems from prior wave.
-    if (round % 2 == 0) {
-      for (final row in board) {
-        for (final cell in row) {
-          if (cell.hasGem) {
-            cell.gem = null;
-            cell.gemRoundsLeft = 0;
-          }
-        }
-      }
-      spawnWave(board, difficultyLevel);
-    } else {
-      // Odd rounds: top-up a few new gems so the board stays interesting.
-      spawnWave(board, difficultyLevel);
-    }
+  /// Half coal (rounded down), remainder valuable gems by difficulty.
+  List<GemType> _buildWaveTypes(int count, int difficultyLevel) {
+    final coalCount = count ~/ 2;
+    final valuableCount = count - coalCount;
+    final types = <GemType>[
+      ...List.filled(coalCount, GemType.coal),
+      for (var i = 0; i < valuableCount; i++) _pickValuable(difficultyLevel),
+    ];
+    types.shuffle(_rng);
+    return types;
   }
 
-  int _spawnCount(int level, int available) {
-    // Early: more gems; later: fewer but richer.
-    final base = level <= 3 ? 6 : (level <= 7 ? 4 : 3);
-    return min(available, base + _rng.nextInt(3));
-  }
-
-  GemType _pickGem(int level) {
+  GemType _pickValuable(int level) {
     final roll = _rng.nextDouble();
     if (level <= 2) {
-      if (roll < 0.55) return GemType.coal;
-      if (roll < 0.85) return GemType.silver;
-      if (roll < 0.95) return GemType.gold;
+      if (roll < 0.55) return GemType.silver;
+      if (roll < 0.85) return GemType.gold;
       return GemType.emerald;
     }
     if (level <= 5) {
-      if (roll < 0.30) return GemType.coal;
-      if (roll < 0.55) return GemType.silver;
-      if (roll < 0.75) return GemType.gold;
-      if (roll < 0.90) return GemType.emerald;
-      if (roll < 0.97) return GemType.ruby;
+      if (roll < 0.30) return GemType.silver;
+      if (roll < 0.55) return GemType.gold;
+      if (roll < 0.80) return GemType.emerald;
+      if (roll < 0.95) return GemType.ruby;
       return GemType.diamond;
     }
-    if (roll < 0.15) return GemType.coal;
-    if (roll < 0.35) return GemType.silver;
-    if (roll < 0.55) return GemType.gold;
-    if (roll < 0.75) return GemType.emerald;
-    if (roll < 0.90) return GemType.ruby;
+    if (roll < 0.20) return GemType.silver;
+    if (roll < 0.40) return GemType.gold;
+    if (roll < 0.65) return GemType.emerald;
+    if (roll < 0.85) return GemType.ruby;
     return GemType.diamond;
   }
 }

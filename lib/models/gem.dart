@@ -9,7 +9,7 @@ enum GemType {
 
 extension GemTypeX on GemType {
   int get value => switch (this) {
-        GemType.coal => 1,
+        GemType.coal => 0,
         GemType.silver => 5,
         GemType.gold => 10,
         GemType.emerald => 15,

@@ -31,7 +31,10 @@ class GameController extends ChangeNotifier {
   String? lastScoreToast;
   bool loaded = false;
 
-  /// Latest gem point flights for the UI to animate (cleared after consume).
+  /// Collectibles cleared toward the next loot refresh (0..lootResetAt).
+  int gemsCollectedTowardReset = 0;
+  static const lootResetAt = 10;
+
   List<CollectedGem> pendingGemFlights = [];
   int clearEventId = 0;
 
@@ -59,6 +62,7 @@ class GameController extends ChangeNotifier {
     round = 1;
     difficultyLevel = 1;
     piecesPlacedThisRound = 0;
+    gemsCollectedTowardReset = 0;
     status = GameStatus.playing;
     maxToast = null;
     lastScoreToast = null;
@@ -71,8 +75,9 @@ class GameController extends ChangeNotifier {
   }
 
   void _seedBoard() {
-    BoardLogic.prefillBoard(board, targetCells: 20 + difficultyLevel * 2);
+    BoardLogic.prefillBoard(board, targetCells: 24 + difficultyLevel * 2);
     _gems.spawnWave(board, difficultyLevel);
+    gemsCollectedTowardReset = 0;
   }
 
   void _dealTray() {
@@ -169,12 +174,29 @@ class GameController extends ChangeNotifier {
       }
     }
 
-    if (clear.collectedGems.isNotEmpty) {
-      pendingGemFlights = List.of(clear.collectedGems);
+    // Dollar trails only for gems that actually pay.
+    final paying = clear.collectedGems.where((g) => g.points > 0).toList();
+    if (paying.isNotEmpty) {
+      pendingGemFlights = paying;
       clearEventId++;
     }
 
+    // Every collectible (including coal) advances the loot reset counter.
+    if (clear.collectedGems.isNotEmpty) {
+      gemsCollectedTowardReset += clear.collectedGems.length;
+      if (gemsCollectedTowardReset >= lootResetAt) {
+        gemsCollectedTowardReset %= lootResetAt;
+        _refreshLootWave();
+      }
+    }
+
     _applyScore(clear.score, clear.linesCleared, clear.gemValueSum);
+  }
+
+  void _refreshLootWave() {
+    _gems.clearAllGems(board);
+    _gems.spawnWave(board, difficultyLevel);
+    lastScoreToast = 'New loot!';
   }
 
   void _handleClearBoardBonus() {
@@ -207,12 +229,10 @@ class GameController extends ChangeNotifier {
       difficultyLevel++;
     }
     round++;
-    _gems.onRoundEnd(board, difficultyLevel, round);
+    // Loot no longer refreshes on round end — only after 10 collects.
     _dealTray();
   }
 
-  /// Game over only when nothing left in the tray can be placed AND the
-  /// player has no remaining rope/dynamite to try to fix the situation.
   void _checkGameOver() {
     final remaining = tray.whereType<TrayPiece>().toList();
     if (remaining.isEmpty) return;
@@ -260,6 +280,7 @@ class GameController extends ChangeNotifier {
         'round': round,
         'difficultyLevel': difficultyLevel,
         'piecesPlacedThisRound': piecesPlacedThisRound,
+        'gemsCollectedTowardReset': gemsCollectedTowardReset,
         'status': status.name,
       };
 
@@ -282,6 +303,7 @@ class GameController extends ChangeNotifier {
     round = json['round'] as int? ?? 1;
     difficultyLevel = json['difficultyLevel'] as int? ?? 1;
     piecesPlacedThisRound = json['piecesPlacedThisRound'] as int? ?? 0;
+    gemsCollectedTowardReset = json['gemsCollectedTowardReset'] as int? ?? 0;
     status = GameStatus.values.firstWhere(
       (s) => s.name == json['status'],
       orElse: () => GameStatus.playing,
