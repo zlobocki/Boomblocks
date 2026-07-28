@@ -25,7 +25,9 @@ class SoundService {
     try {
       await _player.stop();
       await _player.play(
-        AssetSource(highScore ? 'sounds/clear_high.wav' : 'sounds/clear.wav'),
+        AssetSource(
+          highScore ? 'sounds/great_success.mp3' : 'sounds/success.mp3',
+        ),
       );
     } catch (e) {
       debugPrint('Sound play failed: $e');
