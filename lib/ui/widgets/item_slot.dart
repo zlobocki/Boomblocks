@@ -11,8 +11,10 @@ class ItemSlot extends StatelessWidget {
     required this.assetPath,
     required this.meter,
     required this.accent,
-    required this.onDragStarted,
-    required this.onDragEnded,
+    required this.onDragStart,
+    required this.onDragUpdate,
+    required this.onDragEnd,
+    this.dragging = false,
     this.enabled = true,
     this.showMax = false,
   });
@@ -21,8 +23,10 @@ class ItemSlot extends StatelessWidget {
   final String assetPath;
   final ItemMeter meter;
   final Color accent;
-  final VoidCallback onDragStarted;
-  final VoidCallback onDragEnded;
+  final void Function(Offset global) onDragStart;
+  final void Function(Offset global) onDragUpdate;
+  final VoidCallback onDragEnd;
+  final bool dragging;
   final bool enabled;
   final bool showMax;
 
@@ -35,41 +39,30 @@ class ItemSlot extends StatelessWidget {
         Stack(
           clipBehavior: Clip.none,
           children: [
-            LongPressDraggable<String>(
-              data: label.toLowerCase(),
-              maxSimultaneousDrags: canDrag ? 1 : 0,
-              dragAnchorStrategy: pointerDragAnchorStrategy,
-              onDragStarted: onDragStarted,
-              onDragEnd: (_) => onDragEnded(),
-              feedback: Material(
-                color: Colors.transparent,
-                child: _IconBadge(
-                  assetPath: assetPath,
-                  accent: accent,
-                  count: meter.count,
-                  dragging: true,
-                ),
-              ),
-              childWhenDragging: Opacity(
-                opacity: 0.35,
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onPanStart: !canDrag
+                  ? null
+                  : (d) => onDragStart(d.globalPosition),
+              onPanUpdate: !canDrag
+                  ? null
+                  : (d) => onDragUpdate(d.globalPosition),
+              onPanEnd: !canDrag ? null : (_) => onDragEnd(),
+              onPanCancel: !canDrag ? null : onDragEnd,
+              child: Opacity(
+                opacity: dragging ? 0.35 : (canDrag ? 1 : 0.45),
                 child: _IconBadge(
                   assetPath: assetPath,
                   accent: accent,
                   count: meter.count,
                 ),
-              ),
-              child: _IconBadge(
-                assetPath: assetPath,
-                accent: accent,
-                count: meter.count,
-                dimmed: !canDrag,
               ),
             ),
             if (showMax)
-              Positioned(
+              const Positioned(
                 top: -10,
                 right: -8,
-                child: const _MaxBadge(),
+                child: _MaxBadge(),
               ),
           ],
         ),
@@ -118,56 +111,48 @@ class _IconBadge extends StatelessWidget {
     required this.assetPath,
     required this.accent,
     required this.count,
-    this.dragging = false,
-    this.dimmed = false,
   });
 
   final String assetPath;
   final Color accent;
   final int count;
-  final bool dragging;
-  final bool dimmed;
 
   @override
   Widget build(BuildContext context) {
-    final size = dragging ? 72.0 : 60.0;
-    return Opacity(
-      opacity: dimmed ? 0.45 : 1,
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned.fill(
-              child: Image.asset(
-                assetPath,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.medium,
-              ),
+    return SizedBox(
+      width: 60,
+      height: 60,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              assetPath,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.medium,
             ),
-            Positioned(
-              right: 0,
-              top: 0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                decoration: BoxDecoration(
-                  color: accent,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white, width: 1.5),
-                ),
-                child: Text(
-                  '$count',
-                  style: GoogleFonts.nunito(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
+          ),
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              child: Text(
+                '$count',
+                style: GoogleFonts.nunito(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

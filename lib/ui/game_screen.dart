@@ -32,16 +32,22 @@ class _GameScreenState extends State<GameScreen> {
   bool _previewValid = false;
   int? _dynamiteRow;
   int? _dynamiteCol;
+
   bool _draggingRope = false;
   bool _draggingDynamite = false;
+  int? _ropeHoverTrayIndex;
   bool _showRopeMax = false;
   bool _showDynMax = false;
   bool _gameOverShown = false;
 
   int? _dragTrayIndex;
-  Offset? _dragPointerGlobal;
+  Offset? _pointerGlobal;
+
   final GlobalKey _boardKey = GlobalKey();
-  final GlobalKey _stackKey = GlobalKey();
+  final GlobalKey _rootKey = GlobalKey();
+  final List<GlobalKey> _trayKeys = List.generate(3, (_) => GlobalKey());
+
+  double _cellSize = 40;
 
   GameController get c => widget.controller;
 
@@ -86,95 +92,104 @@ class _GameScreenState extends State<GameScreen> {
     }
   }
 
-  RenderBox? _boardBox() {
-    return _boardKey.currentContext?.findRenderObject() as RenderBox?;
+  RenderBox? _boardBox() =>
+      _boardKey.currentContext?.findRenderObject() as RenderBox?;
+
+  Offset? _toRootLocal(Offset global) {
+    final box = _rootKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return null;
+    return box.globalToLocal(global);
   }
 
-  void _updatePieceSnapFromPointer(
-    Offset global,
-    TrayPiece piece,
-    double cellSize,
-  ) {
+  void _updatePieceSnap(Offset global, TrayPiece piece) {
     final box = _boardBox();
     if (box == null || !box.hasSize) return;
 
     final local = box.globalToLocal(global);
-    final lift = cellSize * (piece.shape.height + 0.55);
-    final anchorX = local.dx - (piece.shape.width * cellSize) / 2;
+    final lift = _cellSize * (piece.shape.height + 0.55);
+    final anchorX = local.dx - (piece.shape.width * _cellSize) / 2;
     final anchorY = local.dy - lift;
 
-    var originCol = (anchorX / cellSize).round();
-    var originRow = (anchorY / cellSize).round();
+    var originCol = (anchorX / _cellSize).round();
+    var originRow = (anchorY / _cellSize).round();
     originCol = originCol.clamp(0, BoardLogic.size - piece.shape.width);
     originRow = originRow.clamp(0, BoardLogic.size - piece.shape.height);
 
-    final pad = cellSize * 2;
+    final pad = _cellSize * 2;
     final outside = local.dx < -pad ||
         local.dy < -pad ||
         local.dx > box.size.width + pad ||
         local.dy > box.size.height + pad;
 
-    if (outside) {
-      setState(() {
+    setState(() {
+      _pointerGlobal = global;
+      if (outside) {
         _previewShape = null;
         _previewRow = null;
         _previewCol = null;
         _previewValid = false;
-        _dragPointerGlobal = global;
-      });
-      return;
-    }
-
-    final valid =
-        BoardLogic.canPlace(c.board, piece.shape, originRow, originCol);
-    setState(() {
-      _previewShape = piece.shape;
-      _previewRow = originRow;
-      _previewCol = originCol;
-      _previewValid = valid;
-      _dragPointerGlobal = global;
+      } else {
+        _previewShape = piece.shape;
+        _previewRow = originRow;
+        _previewCol = originCol;
+        _previewValid =
+            BoardLogic.canPlace(c.board, piece.shape, originRow, originCol);
+      }
     });
   }
 
-  void _updateDynamiteFromPointer(Offset global, double cellSize) {
+  void _updateDynamiteSnap(Offset global) {
     final box = _boardBox();
     if (box == null || !box.hasSize) return;
     final local = box.globalToLocal(global);
-    if (local.dx < 0 ||
-        local.dy < 0 ||
-        local.dx > box.size.width ||
-        local.dy > box.size.height) {
-      setState(() {
+    setState(() {
+      _pointerGlobal = global;
+      if (local.dx < 0 ||
+          local.dy < 0 ||
+          local.dx > box.size.width ||
+          local.dy > box.size.height) {
         _dynamiteRow = null;
         _dynamiteCol = null;
-        _dragPointerGlobal = global;
-      });
-      return;
-    }
-    setState(() {
-      _dynamiteCol =
-          (local.dx / cellSize).floor().clamp(0, BoardLogic.size - 1);
-      _dynamiteRow =
-          (local.dy / cellSize).floor().clamp(0, BoardLogic.size - 1);
-      _dragPointerGlobal = global;
+      } else {
+        _dynamiteCol =
+            (local.dx / _cellSize).floor().clamp(0, BoardLogic.size - 1);
+        _dynamiteRow =
+            (local.dy / _cellSize).floor().clamp(0, BoardLogic.size - 1);
+      }
     });
   }
 
-  void _finishDrag() {
-    if (_dragTrayIndex != null) {
-      final idx = _dragTrayIndex!;
-      if (_previewValid && _previewRow != null && _previewCol != null) {
-        c.placePiece(idx, _previewRow!, _previewCol!);
-      }
-    } else if (_draggingDynamite) {
-      if (_dynamiteRow != null && _dynamiteCol != null) {
-        c.useDynamite(_dynamiteRow!, _dynamiteCol!);
+  void _updateRopeHover(Offset global) {
+    int? hit;
+    for (var i = 0; i < _trayKeys.length; i++) {
+      final box =
+          _trayKeys[i].currentContext?.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize) continue;
+      final topLeft = box.localToGlobal(Offset.zero);
+      final rect = topLeft & box.size;
+      if (rect.contains(global)) {
+        final piece = c.tray[i];
+        if (piece != null && !piece.hasRope) {
+          hit = i;
+        }
+        break;
       }
     }
-    _clearPreview();
+    setState(() {
+      _pointerGlobal = global;
+      _ropeHoverTrayIndex = hit;
+    });
   }
 
-  void _clearPreview() {
+  void _endRopeDrag() {
+    final idx = _ropeHoverTrayIndex;
+    if (idx != null) {
+      c.applyRopeToPiece(idx);
+    }
+    _clearDrag();
+  }
+
+  void _clearDrag() {
     setState(() {
       _previewShape = null;
       _previewRow = null;
@@ -184,9 +199,28 @@ class _GameScreenState extends State<GameScreen> {
       _dynamiteCol = null;
       _draggingRope = false;
       _draggingDynamite = false;
+      _ropeHoverTrayIndex = null;
       _dragTrayIndex = null;
-      _dragPointerGlobal = null;
+      _pointerGlobal = null;
     });
+  }
+
+  void _endPieceDrag() {
+    final idx = _dragTrayIndex;
+    if (idx != null &&
+        _previewValid &&
+        _previewRow != null &&
+        _previewCol != null) {
+      c.placePiece(idx, _previewRow!, _previewCol!);
+    }
+    _clearDrag();
+  }
+
+  void _endDynamiteDrag() {
+    if (_dynamiteRow != null && _dynamiteCol != null) {
+      c.useDynamite(_dynamiteRow!, _dynamiteCol!);
+    }
+    _clearDrag();
   }
 
   Future<void> _showGameOver() async {
@@ -308,14 +342,6 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  Offset? _localPointer() {
-    final global = _dragPointerGlobal;
-    if (global == null) return null;
-    final box = _stackKey.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null || !box.hasSize) return null;
-    return box.globalToLocal(global);
-  }
-
   @override
   Widget build(BuildContext context) {
     if (!c.loaded) {
@@ -326,201 +352,214 @@ class _GameScreenState extends State<GameScreen> {
 
     final width = MediaQuery.sizeOf(context).width;
     final boardSide = (width - 32).clamp(280.0, 420.0);
-    final cellSize = boardSide / BoardLogic.size;
-    final localPointer = _localPointer();
+    _cellSize = boardSide / BoardLogic.size;
+
+    final localPointer =
+        _pointerGlobal == null ? null : _toRootLocal(_pointerGlobal!);
     final draggingPiece =
         _dragTrayIndex != null ? c.tray[_dragTrayIndex!] : null;
 
     return Scaffold(
-      body: Listener(
-        behavior: HitTestBehavior.translucent,
-        onPointerMove: (e) {
-          if (_dragTrayIndex != null) {
-            final piece = c.tray[_dragTrayIndex!];
-            if (piece != null) {
-              _updatePieceSnapFromPointer(e.position, piece, cellSize);
-            }
-          } else if (_draggingDynamite) {
-            _updateDynamiteFromPointer(e.position, cellSize);
-          }
-        },
-        onPointerUp: (_) => _finishDrag(),
-        onPointerCancel: (_) => _clearPreview(),
-        child: Container(
-          key: _stackKey,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                BoomColors.skyTop,
-                BoomColors.skyBottom,
-                Color(0xFFE8C9A0),
-              ],
-            ),
+      body: Container(
+        key: _rootKey,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              BoomColors.skyTop,
+              BoomColors.skyBottom,
+              Color(0xFFE8C9A0),
+            ],
           ),
-          child: Stack(
-            children: [
-              SafeArea(
-                child: Column(
-                  children: [
-                    GameHud(
-                      score: c.score,
-                      round: c.round,
-                      difficulty: c.difficultyLevel,
-                      scoreToast: c.lastScoreToast,
-                      onMenu: _openMenu,
-                    ),
-                    const SizedBox(height: 4),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Center(
-                        child: KeyedSubtree(
-                          key: _boardKey,
-                          child: BoardWidget(
-                            board: c.board,
-                            cellSize: cellSize,
-                            previewShape: _previewShape,
-                            previewRow: _previewRow,
-                            previewCol: _previewCol,
-                            previewValid: _previewValid,
-                            dynamiteHoverRow:
-                                _draggingDynamite ? _dynamiteRow : null,
-                            dynamiteHoverCol:
-                                _draggingDynamite ? _dynamiteCol : null,
-                          ),
+        ),
+        child: Stack(
+          children: [
+            SafeArea(
+              child: Column(
+                children: [
+                  GameHud(
+                    score: c.score,
+                    round: c.round,
+                    difficulty: c.difficultyLevel,
+                    scoreToast: c.lastScoreToast,
+                    onMenu: _openMenu,
+                  ),
+                  const SizedBox(height: 4),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Center(
+                      child: KeyedSubtree(
+                        key: _boardKey,
+                        child: BoardWidget(
+                          board: c.board,
+                          cellSize: _cellSize,
+                          previewShape: _previewShape,
+                          previewRow: _previewRow,
+                          previewCol: _previewCol,
+                          previewValid: _previewValid,
+                          dynamiteHoverRow:
+                              _draggingDynamite ? _dynamiteRow : null,
+                          dynamiteHoverCol:
+                              _draggingDynamite ? _dynamiteCol : null,
                         ),
-                      ),
-                    ),
-                    const Spacer(),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 10,
-                          horizontal: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: BoomColors.tray.withValues(alpha: 0.92),
-                          borderRadius: BorderRadius.circular(22),
-                          border: Border.all(
-                            color: BoomColors.earth.withValues(alpha: 0.45),
-                          ),
-                        ),
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            const gap = 6.0;
-                            final slotW =
-                                (constraints.maxWidth - gap * 2) / 3;
-                            const maxCells = 4;
-                            final pieceCell = ((slotW - 8) / maxCells)
-                                .clamp(12.0, cellSize * 0.7);
-                            return Row(
-                              children: List.generate(3, (i) {
-                                final piece = c.tray[i];
-                                return Padding(
-                                  padding: EdgeInsets.only(
-                                    left: i == 0 ? 0 : gap,
-                                  ),
-                                  child: SizedBox(
-                                    width: slotW,
-                                    child: _TraySlot(
-                                      piece: piece,
-                                      slotSize: slotW,
-                                      cellSize: pieceCell,
-                                      highlighted: _draggingRope,
-                                      dragging: _dragTrayIndex == i,
-                                      onTap: piece != null && piece.hasRope
-                                          ? () => c.rotatePiece(i)
-                                          : null,
-                                      onDragStart: (global) {
-                                        setState(() {
-                                          _dragTrayIndex = i;
-                                          _dragPointerGlobal = global;
-                                        });
-                                        if (piece != null) {
-                                          _updatePieceSnapFromPointer(
-                                            global,
-                                            piece,
-                                            cellSize,
-                                          );
-                                        }
-                                      },
-                                      onDragUpdate: (global) {
-                                        if (piece == null) return;
-                                        _updatePieceSnapFromPointer(
-                                          global,
-                                          piece,
-                                          cellSize,
-                                        );
-                                      },
-                                      onAcceptRope: () {
-                                        c.applyRopeToPiece(i);
-                                        setState(
-                                            () => _draggingRope = false);
-                                      },
-                                    ),
-                                  ),
-                                );
-                              }),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          ItemSlot(
-                            label: 'Rope',
-                            assetPath: GameAssets.rope,
-                            meter: c.inventory.rope,
-                            accent: BoomColors.rope,
-                            showMax: _showRopeMax,
-                            onDragStarted: () =>
-                                setState(() => _draggingRope = true),
-                            onDragEnded: () =>
-                                setState(() => _draggingRope = false),
-                          ),
-                          const SizedBox(width: 28),
-                          ItemSlot(
-                            label: 'Dynamite',
-                            assetPath: GameAssets.dynamite,
-                            meter: c.inventory.dynamite,
-                            accent: BoomColors.dynamite,
-                            showMax: _showDynMax,
-                            onDragStarted: () =>
-                                setState(() => _draggingDynamite = true),
-                            onDragEnded: () {},
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (draggingPiece != null && localPointer != null)
-                Positioned(
-                  left: localPointer.dx -
-                      (draggingPiece.shape.width * cellSize) / 2,
-                  top: localPointer.dy -
-                      cellSize * (draggingPiece.shape.height + 0.55),
-                  child: IgnorePointer(
-                    child: Opacity(
-                      opacity: 0.95,
-                      child: PiecePreview(
-                        shape: draggingPiece.shape,
-                        cellSize: cellSize,
-                        hasRope: draggingPiece.hasRope,
                       ),
                     ),
                   ),
+                  const Spacer(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 10,
+                        horizontal: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: BoomColors.tray.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(
+                          color: BoomColors.earth.withValues(alpha: 0.45),
+                        ),
+                      ),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          const gap = 6.0;
+                          final slotW = (constraints.maxWidth - gap * 2) / 3;
+                          const maxCells = 4;
+                          final pieceCell = ((slotW - 8) / maxCells)
+                              .clamp(12.0, _cellSize * 0.7);
+                          return Row(
+                            children: List.generate(3, (i) {
+                              final piece = c.tray[i];
+                              return Padding(
+                                padding: EdgeInsets.only(left: i == 0 ? 0 : gap),
+                                child: SizedBox(
+                                  key: _trayKeys[i],
+                                  width: slotW,
+                                  child: _TraySlot(
+                                    piece: piece,
+                                    slotSize: slotW,
+                                    cellSize: pieceCell,
+                                    highlighted: _draggingRope &&
+                                        _ropeHoverTrayIndex == i,
+                                    dragging: _dragTrayIndex == i,
+                                    onTap: piece != null && piece.hasRope
+                                        ? () => c.rotatePiece(i)
+                                        : null,
+                                    onDragStart: (global) {
+                                      if (piece == null) return;
+                                      setState(() {
+                                        _dragTrayIndex = i;
+                                        _pointerGlobal = global;
+                                      });
+                                      _updatePieceSnap(global, piece);
+                                    },
+                                    onDragUpdate: (global) {
+                                      final p = c.tray[i];
+                                      if (p == null) return;
+                                      _updatePieceSnap(global, p);
+                                    },
+                                    onDragEnd: _endPieceDrag,
+                                    onDragCancel: _clearDrag,
+                                  ),
+                                ),
+                              );
+                            }),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ItemSlot(
+                          label: 'Rope',
+                          assetPath: GameAssets.rope,
+                          meter: c.inventory.rope,
+                          accent: BoomColors.rope,
+                          showMax: _showRopeMax,
+                          dragging: _draggingRope,
+                          onDragStart: (global) {
+                            setState(() {
+                              _draggingRope = true;
+                              _pointerGlobal = global;
+                            });
+                            _updateRopeHover(global);
+                          },
+                          onDragUpdate: _updateRopeHover,
+                          onDragEnd: _endRopeDrag,
+                        ),
+                        const SizedBox(width: 28),
+                        ItemSlot(
+                          label: 'Dynamite',
+                          assetPath: GameAssets.dynamite,
+                          meter: c.inventory.dynamite,
+                          accent: BoomColors.dynamite,
+                          showMax: _showDynMax,
+                          dragging: _draggingDynamite,
+                          onDragStart: (global) {
+                            setState(() {
+                              _draggingDynamite = true;
+                              _pointerGlobal = global;
+                            });
+                            _updateDynamiteSnap(global);
+                          },
+                          onDragUpdate: _updateDynamiteSnap,
+                          onDragEnd: _endDynamiteDrag,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Floating piece / item under finger
+            if (draggingPiece != null && localPointer != null)
+              Positioned(
+                left: localPointer.dx -
+                    (draggingPiece.shape.width * _cellSize) / 2,
+                top: localPointer.dy -
+                    _cellSize * (draggingPiece.shape.height + 0.55),
+                child: IgnorePointer(
+                  child: Opacity(
+                    opacity: 0.95,
+                    child: PiecePreview(
+                      shape: draggingPiece.shape,
+                      cellSize: _cellSize,
+                      hasRope: draggingPiece.hasRope,
+                    ),
+                  ),
                 ),
-            ],
-          ),
+              ),
+            if (_draggingDynamite && localPointer != null)
+              Positioned(
+                left: localPointer.dx - 36,
+                top: localPointer.dy - 36,
+                child: IgnorePointer(
+                  child: Image.asset(
+                    GameAssets.dynamite,
+                    width: 72,
+                    height: 72,
+                  ),
+                ),
+              ),
+            if (_draggingRope && localPointer != null)
+              Positioned(
+                left: localPointer.dx - 36,
+                top: localPointer.dy - 36,
+                child: IgnorePointer(
+                  child: Image.asset(
+                    GameAssets.rope,
+                    width: 72,
+                    height: 72,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -534,7 +573,8 @@ class _TraySlot extends StatelessWidget {
     required this.cellSize,
     required this.onDragStart,
     required this.onDragUpdate,
-    required this.onAcceptRope,
+    required this.onDragEnd,
+    required this.onDragCancel,
     this.onTap,
     this.highlighted = false,
     this.dragging = false,
@@ -545,7 +585,8 @@ class _TraySlot extends StatelessWidget {
   final double cellSize;
   final void Function(Offset global) onDragStart;
   final void Function(Offset global) onDragUpdate;
-  final VoidCallback onAcceptRope;
+  final VoidCallback onDragEnd;
+  final VoidCallback onDragCancel;
   final VoidCallback? onTap;
   final bool highlighted;
   final bool dragging;
@@ -581,20 +622,19 @@ class _TraySlot extends StatelessWidget {
     );
 
     if (p != null) {
+      // Immediate pan-drag (no long-press). Tap still works for rope rotate
+      // when the finger doesn't move past touch slop.
       child = GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        onLongPressStart: (d) => onDragStart(d.globalPosition),
-        onLongPressMoveUpdate: (d) => onDragUpdate(d.globalPosition),
+        onPanStart: (d) => onDragStart(d.globalPosition),
+        onPanUpdate: (d) => onDragUpdate(d.globalPosition),
+        onPanEnd: (_) => onDragEnd(),
+        onPanCancel: onDragCancel,
         child: child,
       );
     }
 
-    return DragTarget<String>(
-      onWillAcceptWithDetails: (d) =>
-          d.data == 'rope' && p != null && !p.hasRope,
-      onAcceptWithDetails: (_) => onAcceptRope(),
-      builder: (context, cand, rej) => child,
-    );
+    return child;
   }
 }
