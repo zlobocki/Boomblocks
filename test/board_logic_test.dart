@@ -105,6 +105,21 @@ void main() {
         expect(board[r].every((c) => c.filled), isFalse);
       }
     });
+
+    test('collected gems include per-gem points with multiplier', () {
+      final board = BoardLogic.emptyBoard();
+      for (var c = 0; c < 8; c++) {
+        board[0][c].placeEarth();
+        board[1][c].placeEarth();
+      }
+      board[0][0].setGem(GemType.gold); // 10
+      board[1][3].setGem(GemType.coal); // 1
+      final result = BoardLogic.clearCompletedLines(board);
+      expect(result.linesCleared, 2);
+      expect(result.collectedGems.length, 2);
+      expect(result.collectedGems.map((g) => g.points).toSet(), {20, 2});
+      expect(result.score, 22);
+    });
   });
 
   group('ItemMeter', () {

@@ -11,6 +11,7 @@ class GameHud extends StatelessWidget {
     required this.difficulty,
     this.scoreToast,
     required this.onMenu,
+    this.scoreKey,
   });
 
   final int score;
@@ -18,6 +19,7 @@ class GameHud extends StatelessWidget {
   final int difficulty;
   final String? scoreToast;
   final VoidCallback onMenu;
+  final GlobalKey? scoreKey;
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +58,10 @@ class GameHud extends StatelessWidget {
               ],
             ),
           ),
-          _StatChip(label: 'Score', value: '$score'),
+          KeyedSubtree(
+            key: scoreKey,
+            child: _StatChip(label: 'Cash', value: '\$$score'),
+          ),
           const SizedBox(width: 8),
           _StatChip(label: 'Rnd', value: '$round'),
         ],

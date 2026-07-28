@@ -55,6 +55,7 @@ class ItemSlot extends StatelessWidget {
                   assetPath: assetPath,
                   accent: accent,
                   count: meter.count,
+                  maxCount: meter.maxCount,
                 ),
               ),
             ),
@@ -111,11 +112,13 @@ class _IconBadge extends StatelessWidget {
     required this.assetPath,
     required this.accent,
     required this.count,
+    required this.maxCount,
   });
 
   final String assetPath;
   final Color accent;
   final int count;
+  final int maxCount;
 
   @override
   Widget build(BuildContext context) {
@@ -133,8 +136,8 @@ class _IconBadge extends StatelessWidget {
             ),
           ),
           Positioned(
-            right: 0,
-            top: 0,
+            right: -4,
+            top: -2,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
               decoration: BoxDecoration(
@@ -143,9 +146,9 @@ class _IconBadge extends StatelessWidget {
                 border: Border.all(color: Colors.white, width: 1.5),
               ),
               child: Text(
-                '$count',
+                '$count/$maxCount',
                 style: GoogleFonts.nunito(
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.w800,
                   color: Colors.white,
                 ),

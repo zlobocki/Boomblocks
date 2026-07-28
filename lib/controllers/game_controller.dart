@@ -8,6 +8,7 @@ import '../persistence/game_storage.dart';
 import '../systems/board_logic.dart';
 import '../systems/gem_spawner.dart';
 import '../systems/piece_generator.dart';
+import '../systems/sound_service.dart';
 
 enum GameStatus { playing, gameOver }
 
@@ -30,9 +31,15 @@ class GameController extends ChangeNotifier {
   String? lastScoreToast;
   bool loaded = false;
 
+  /// Latest gem point flights for the UI to animate (cleared after consume).
+  List<CollectedGem> pendingGemFlights = [];
+  int clearEventId = 0;
+
   static const clearBoardBonusBase = 250;
+  static const highScoreClearThreshold = 40;
 
   Future<void> init({bool forceNew = false}) async {
+    await SoundService.instance.init();
     if (!forceNew) {
       final saved = await _storage.loadGame();
       if (saved != null) {
@@ -55,6 +62,7 @@ class GameController extends ChangeNotifier {
     status = GameStatus.playing;
     maxToast = null;
     lastScoreToast = null;
+    pendingGemFlights = [];
     _seedBoard();
     _dealTray();
     loaded = true;
@@ -79,12 +87,17 @@ class GameController extends ChangeNotifier {
     lastScoreToast = null;
   }
 
+  void consumeGemFlights() {
+    pendingGemFlights = [];
+  }
+
   bool applyRopeToPiece(int trayIndex) {
     if (status != GameStatus.playing) return false;
     final piece = tray[trayIndex];
     if (piece == null || piece.hasRope) return false;
     if (!inventory.rope.tryConsume()) return false;
     piece.hasRope = true;
+    _checkGameOver();
     _persist();
     notifyListeners();
     return true;
@@ -94,6 +107,7 @@ class GameController extends ChangeNotifier {
     final piece = tray[trayIndex];
     if (piece == null || !piece.hasRope) return;
     piece.rotate();
+    _checkGameOver();
     notifyListeners();
   }
 
@@ -114,7 +128,7 @@ class GameController extends ChangeNotifier {
     piecesPlacedThisRound++;
 
     final clear = BoardLogic.clearCompletedLines(board);
-    _applyScore(clear.score, clear.linesCleared, clear.gemValueSum);
+    _handleClearResult(clear);
     _handleClearBoardBonus();
 
     if (piecesPlacedThisRound >= 3 || tray.every((p) => p == null)) {
@@ -133,7 +147,7 @@ class GameController extends ChangeNotifier {
     if (!inventory.dynamite.tryConsume()) return false;
 
     final result = BoardLogic.clearDynamite(board, row, col);
-    _applyScore(result.score, result.linesCleared, result.gemValueSum);
+    _handleClearResult(result);
     _handleClearBoardBonus();
     _checkGameOver();
     _persist();
@@ -141,11 +155,27 @@ class GameController extends ChangeNotifier {
     return true;
   }
 
+  void _handleClearResult(ClearResult clear) {
+    if (clear.linesCleared > 0 || clear.collectedGems.isNotEmpty) {
+      final high = clear.score >= highScoreClearThreshold ||
+          clear.linesCleared >= 2 ||
+          clear.collectedGems.any((g) => g.points >= 25);
+      SoundService.instance.playClear(highScore: high);
+    }
+
+    if (clear.collectedGems.isNotEmpty) {
+      pendingGemFlights = List.of(clear.collectedGems);
+      clearEventId++;
+    }
+
+    _applyScore(clear.score, clear.linesCleared, clear.gemValueSum);
+  }
+
   void _handleClearBoardBonus() {
     if (!BoardLogic.isEmpty(board)) return;
     final bonus = clearBoardBonusBase * difficultyLevel;
     score += bonus;
-    lastScoreToast = 'BOARD CLEAR! +$bonus';
+    lastScoreToast = 'BOARD CLEAR! +\$$bonus';
     final ropeMax = inventory.rope.addScore(bonus);
     final dynMax = inventory.dynamite.addScore(bonus);
     if (ropeMax || dynMax) maxToast = 'MAX';
@@ -156,8 +186,8 @@ class GameController extends ChangeNotifier {
     if (gained <= 0) return;
     score += gained;
     lastScoreToast = lines > 1
-        ? '+$gained  ($lines×$gemSum)'
-        : '+$gained';
+        ? '+\$$gained  ($lines×\$$gemSum)'
+        : '+\$$gained';
 
     final ropeMax = inventory.rope.addScore(gained);
     final dynMax = inventory.dynamite.addScore(gained);
@@ -175,10 +205,19 @@ class GameController extends ChangeNotifier {
     _dealTray();
   }
 
+  /// Game over only when nothing left in the tray can be placed AND the
+  /// player has no remaining rope/dynamite to try to fix the situation.
   void _checkGameOver() {
-    if (!BoardLogic.allPiecesPlaceable(board, tray)) {
-      status = GameStatus.gameOver;
-    }
+    final remaining = tray.whereType<TrayPiece>().toList();
+    if (remaining.isEmpty) return;
+
+    final anyPlaceable =
+        remaining.any((p) => BoardLogic.canPlaceAnywhere(board, p));
+    if (anyPlaceable) return;
+
+    if (inventory.rope.count > 0 || inventory.dynamite.count > 0) return;
+
+    status = GameStatus.gameOver;
   }
 
   Future<bool> qualifiesForScoreboard() => _storage.qualifiesForTop10(score);
@@ -207,7 +246,8 @@ class GameController extends ChangeNotifier {
   }
 
   Map<String, dynamic> toJson() => {
-        'board': board.map((row) => row.map((c) => c.toJson()).toList()).toList(),
+        'board':
+            board.map((row) => row.map((c) => c.toJson()).toList()).toList(),
         'tray': tray.map((p) => p?.toJson()).toList(),
         'inventory': inventory.toJson(),
         'score': score,

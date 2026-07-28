@@ -4,25 +4,43 @@ import '../models/cell.dart';
 import '../models/gem.dart';
 import '../models/piece.dart';
 
+class CollectedGem {
+  CollectedGem({
+    required this.row,
+    required this.col,
+    required this.baseValue,
+    required this.points,
+  });
+
+  final int row;
+  final int col;
+  final int baseValue;
+  /// Points awarded for this gem after line multiplier.
+  final int points;
+}
+
 class ClearResult {
   ClearResult({
     required this.rowsCleared,
     required this.colsCleared,
     required this.gemValueSum,
     required this.clearedCells,
+    this.collectedGems = const [],
   });
 
   final int rowsCleared;
   final int colsCleared;
   final int gemValueSum;
   final List<Point<int>> clearedCells;
+  final List<CollectedGem> collectedGems;
 
   int get linesCleared => rowsCleared + colsCleared;
 
+  int get multiplier => linesCleared <= 0 ? 1 : linesCleared;
+
   int get score {
     if (gemValueSum <= 0) return 0;
-    final mult = linesCleared <= 0 ? 1 : linesCleared;
-    return mult * gemValueSum;
+    return multiplier * gemValueSum;
   }
 }
 
@@ -118,23 +136,29 @@ class BoardLogic {
     }
 
     final cleared = <Point<int>>{};
-    var gemSum = 0;
-
-    void collect(int r, int c) {
-      final cell = board[r][c];
-      if (!cell.filled) return;
-      if (cell.hasGem) gemSum += cell.gem!.value;
-      cleared.add(Point(c, r));
-    }
-
     for (final r in fullRows) {
       for (var c = 0; c < size; c++) {
-        collect(r, c);
+        cleared.add(Point(c, r));
       }
     }
     for (final c in fullCols) {
       for (var r = 0; r < size; r++) {
-        collect(r, c);
+        cleared.add(Point(c, r));
+      }
+    }
+
+    final gemCells = <CollectedGem>[];
+    var gemSum = 0;
+    for (final p in cleared) {
+      final cell = board[p.y][p.x];
+      if (cell.hasGem) {
+        gemSum += cell.gem!.value;
+        gemCells.add(CollectedGem(
+          row: p.y,
+          col: p.x,
+          baseValue: cell.gem!.value,
+          points: cell.gem!.value,
+        ));
       }
     }
 
@@ -142,11 +166,24 @@ class BoardLogic {
       board[p.y][p.x].clear();
     }
 
+    final lines = fullRows.length + fullCols.length;
+    final mult = lines <= 0 ? 1 : lines;
+    final gems = [
+      for (final g in gemCells)
+        CollectedGem(
+          row: g.row,
+          col: g.col,
+          baseValue: g.baseValue,
+          points: g.baseValue * mult,
+        ),
+    ];
+
     return ClearResult(
       rowsCleared: fullRows.length,
       colsCleared: fullCols.length,
       gemValueSum: gemSum,
       clearedCells: cleared.toList(),
+      collectedGems: gems,
     );
   }
 
@@ -156,6 +193,7 @@ class BoardLogic {
     int row,
     int col,
   ) {
+    final gemCells = <CollectedGem>[];
     var gemSum = 0;
     final cleared = <Point<int>>[];
     for (var r = row - 1; r <= row + 1; r++) {
@@ -163,19 +201,39 @@ class BoardLogic {
         if (r < 0 || r >= size || c < 0 || c >= size) continue;
         final cell = board[r][c];
         if (!cell.filled) continue;
-        if (cell.hasGem) gemSum += cell.gem!.value;
+        if (cell.hasGem) {
+          gemSum += cell.gem!.value;
+          gemCells.add(CollectedGem(
+            row: r,
+            col: c,
+            baseValue: cell.gem!.value,
+            points: cell.gem!.value,
+          ));
+        }
         cell.clear();
         cleared.add(Point(c, r));
       }
     }
-    // Dynamite itself doesn't fill lines; after blast, check if any
-    // remaining full lines exist (unlikely but harmless).
     final followUp = clearCompletedLines(board);
+    final mult = followUp.multiplier;
+    // Dynamite gems use follow-up line multiplier when lines also clear.
+    final dynMult = followUp.linesCleared > 0 ? mult : 1;
+    final gems = [
+      for (final g in gemCells)
+        CollectedGem(
+          row: g.row,
+          col: g.col,
+          baseValue: g.baseValue,
+          points: g.baseValue * dynMult,
+        ),
+      ...followUp.collectedGems,
+    ];
     return ClearResult(
       rowsCleared: followUp.rowsCleared,
       colsCleared: followUp.colsCleared,
       gemValueSum: gemSum + followUp.gemValueSum,
       clearedCells: [...cleared, ...followUp.clearedCells],
+      collectedGems: gems,
     );
   }
 

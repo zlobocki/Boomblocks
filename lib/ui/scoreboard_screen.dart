@@ -94,7 +94,7 @@ class ScoreboardScreen extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '${e.score}',
+                        '\$${e.score}',
                         style: GoogleFonts.nunito(
                           fontSize: 20,
                           fontWeight: FontWeight.w800,

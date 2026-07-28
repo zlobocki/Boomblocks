@@ -8,6 +8,7 @@ import '../../theme/app_theme.dart';
 import '../../theme/game_assets.dart';
 import 'scoreboard_screen.dart';
 import 'widgets/board_widget.dart';
+import 'widgets/dollar_flight.dart';
 import 'widgets/hud.dart';
 import 'widgets/item_slot.dart';
 
@@ -45,9 +46,12 @@ class _GameScreenState extends State<GameScreen> {
 
   final GlobalKey _boardKey = GlobalKey();
   final GlobalKey _rootKey = GlobalKey();
+  final GlobalKey _scoreKey = GlobalKey();
   final List<GlobalKey> _trayKeys = List.generate(3, (_) => GlobalKey());
 
   double _cellSize = 40;
+  int _lastFlightEventId = 0;
+  List<CollectedGemFlight> _activeFlights = [];
 
   GameController get c => widget.controller;
 
@@ -72,6 +76,15 @@ class _GameScreenState extends State<GameScreen> {
   void _onUpdate() {
     if (!mounted) return;
     setState(() {
+      if (c.clearEventId != _lastFlightEventId &&
+          c.pendingGemFlights.isNotEmpty) {
+        _lastFlightEventId = c.clearEventId;
+        _activeFlights = [
+          for (final g in c.pendingGemFlights)
+            CollectedGemFlight(row: g.row, col: g.col, points: g.points),
+        ];
+        c.consumeGemFlights();
+      }
       if (c.maxToast != null) {
         _showRopeMax = c.inventory.rope.count >= c.inventory.rope.maxCount;
         _showDynMax =
@@ -246,7 +259,7 @@ class _GameScreenState extends State<GameScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Score: ${c.score}',
+                'Cash: \$${c.score}',
                 style: GoogleFonts.nunito(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
@@ -384,6 +397,7 @@ class _GameScreenState extends State<GameScreen> {
                     difficulty: c.difficultyLevel,
                     scoreToast: c.lastScoreToast,
                     onMenu: _openMenu,
+                    scoreKey: _scoreKey,
                   ),
                   const SizedBox(height: 4),
                   Padding(
@@ -557,6 +571,22 @@ class _GameScreenState extends State<GameScreen> {
                     width: 72,
                     height: 72,
                   ),
+                ),
+              ),
+            if (_activeFlights.isNotEmpty)
+              Positioned.fill(
+                child: DollarFlightLayer(
+                  flights: _activeFlights,
+                  eventId: _lastFlightEventId,
+                  boardKey: _boardKey,
+                  scoreKey: _scoreKey,
+                  rootKey: _rootKey,
+                  cellSize: _cellSize,
+                  onFinished: () {
+                    if (mounted) {
+                      setState(() => _activeFlights = []);
+                    }
+                  },
                 ),
               ),
           ],
