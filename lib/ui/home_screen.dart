@@ -58,16 +58,51 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final shortest = size.shortestSide;
+    // Narrow phones get stronger side letterboxing so art isn't cropped hard.
+    final sidePad = shortest < 360 ? 28.0 : (shortest < 400 ? 20.0 : 12.0);
+    final titleSize = (shortest * 0.11).clamp(28.0, 48.0);
+
     return Scaffold(
+      backgroundColor: BoomColors.skyBottom,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(
-            GameAssets.welcomeBg,
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
+          // Cover the screen, but inset the painted art so edges aren't clipped
+          // as aggressively on tall/narrow phones.
+          Positioned.fill(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: sidePad * 0.35),
+              child: Image.asset(
+                GameAssets.welcomeBg,
+                fit: BoxFit.cover,
+                alignment: const Alignment(0, -0.15),
+              ),
+            ),
           ),
-          // Vignette + lantern warmth so CTAs read clearly
+          // Side vignette bars for narrow screens
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      BoomColors.skyBottom.withValues(alpha: 0.92),
+                      Colors.transparent,
+                      Colors.transparent,
+                      BoomColors.skyBottom.withValues(alpha: 0.92),
+                    ],
+                    stops: shortest < 380
+                        ? const [0.0, 0.08, 0.92, 1.0]
+                        : const [0.0, 0.04, 0.96, 1.0],
+                  ),
+                ),
+              ),
+            ),
+          ),
           AnimatedBuilder(
             animation: _glow,
             builder: (context, _) {
@@ -79,8 +114,8 @@ class _HomeScreenState extends State<HomeScreen>
                     end: Alignment.bottomCenter,
                     colors: [
                       Color.lerp(
-                        const Color(0x33000000),
-                        const Color(0x22000000),
+                        const Color(0x66000000),
+                        const Color(0x44000000),
                         t,
                       )!,
                       Colors.transparent,
@@ -89,9 +124,9 @@ class _HomeScreenState extends State<HomeScreen>
                         const Color(0xBB1A0F08),
                         t,
                       )!,
-                      const Color(0xEE0B0907),
+                      const Color(0xF00B0907),
                     ],
-                    stops: const [0.0, 0.38, 0.68, 1.0],
+                    stops: const [0.0, 0.35, 0.66, 1.0],
                   ),
                 ),
               );
@@ -99,19 +134,47 @@ class _HomeScreenState extends State<HomeScreen>
           ),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
+              padding: EdgeInsets.symmetric(horizontal: sidePad + 8),
               child: Column(
                 children: [
+                  const SizedBox(height: 28),
+                  // Brand lives in Flutter so it always fits the device width.
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'BoomBlocks',
+                      maxLines: 1,
+                      softWrap: false,
+                      style: GoogleFonts.fredoka(
+                        fontSize: titleSize,
+                        fontWeight: FontWeight.w700,
+                        color: BoomColors.gold,
+                        height: 1,
+                        shadows: const [
+                          Shadow(
+                            color: Color(0xCC000000),
+                            blurRadius: 10,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   const Spacer(flex: 5),
-                  // Brand reinforcement above CTAs (bg already has title)
                   Text(
-                    'DIG · CLEAR · CASH IN',
+                    'Clear loot to score points',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.nunito(
-                      fontSize: 13,
+                      fontSize: 15,
                       fontWeight: FontWeight.w800,
-                      letterSpacing: 2.4,
-                      color: BoomColors.gold.withValues(alpha: 0.9),
+                      height: 1.25,
+                      color: BoomColors.cream.withValues(alpha: 0.95),
+                      shadows: const [
+                        Shadow(
+                          color: Color(0xAA000000),
+                          blurRadius: 8,
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 18),

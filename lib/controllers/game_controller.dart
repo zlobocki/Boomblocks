@@ -351,8 +351,10 @@ class GameController extends ChangeNotifier {
     );
     if (anyPlaceable) return;
 
-    // Rope left but still no fit → still game over unless dynamite/undo remain.
-    if (inventory.dynamite.count > 0 || inventory.undo.count > 0) return;
+    // Nothing fits, even considering rope rotations when rope is available
+    // or a piece already has rope. Stay alive only if dynamite can still be
+    // used, or undo can actually be used (has a last placement to restore).
+    if (inventory.dynamite.count > 0 || canUndoPlacement) return;
 
     _startDisasterSequence();
   }

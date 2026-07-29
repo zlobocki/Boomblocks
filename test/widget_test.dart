@@ -8,5 +8,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Play'), findsOneWidget);
     expect(find.text('Top 10'), findsOneWidget);
+    expect(find.text('Clear loot to score points'), findsOneWidget);
+    expect(find.text('BoomBlocks'), findsWidgets);
   });
 }
