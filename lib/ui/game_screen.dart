@@ -124,9 +124,12 @@ class _GameScreenState extends State<GameScreen> {
     if (box == null || !box.hasSize) return;
 
     final local = box.globalToLocal(global);
+    // BoardWidget pads the grid inside the gold frame.
+    final inset = BoardWidget.contentInset;
+    final gridLocal = Offset(local.dx - inset, local.dy - inset);
     final lift = _cellSize * (piece.shape.height + 0.55);
-    final anchorX = local.dx - (piece.shape.width * _cellSize) / 2;
-    final anchorY = local.dy - lift;
+    final anchorX = gridLocal.dx - (piece.shape.width * _cellSize) / 2;
+    final anchorY = gridLocal.dy - lift;
 
     var originCol = (anchorX / _cellSize).round();
     var originRow = (anchorY / _cellSize).round();
@@ -134,10 +137,11 @@ class _GameScreenState extends State<GameScreen> {
     originRow = originRow.clamp(0, BoardLogic.size - piece.shape.height);
 
     final pad = _cellSize * 2;
-    final outside = local.dx < -pad ||
-        local.dy < -pad ||
-        local.dx > box.size.width + pad ||
-        local.dy > box.size.height + pad;
+    final gridSide = _cellSize * BoardLogic.size;
+    final outside = gridLocal.dx < -pad ||
+        gridLocal.dy < -pad ||
+        gridLocal.dx > gridSide + pad ||
+        gridLocal.dy > gridSide + pad;
 
     setState(() {
       _pointerGlobal = global;
@@ -175,19 +179,22 @@ class _GameScreenState extends State<GameScreen> {
     final box = _boardBox();
     if (box == null || !box.hasSize) return;
     final local = box.globalToLocal(global);
+    final inset = BoardWidget.contentInset;
+    final gridLocal = Offset(local.dx - inset, local.dy - inset);
+    final gridSide = _cellSize * BoardLogic.size;
     setState(() {
       _pointerGlobal = global;
-      if (local.dx < 0 ||
-          local.dy < 0 ||
-          local.dx > box.size.width ||
-          local.dy > box.size.height) {
+      if (gridLocal.dx < 0 ||
+          gridLocal.dy < 0 ||
+          gridLocal.dx > gridSide ||
+          gridLocal.dy > gridSide) {
         _dynamiteRow = null;
         _dynamiteCol = null;
       } else {
         _dynamiteCol =
-            (local.dx / _cellSize).floor().clamp(0, BoardLogic.size - 1);
+            (gridLocal.dx / _cellSize).floor().clamp(0, BoardLogic.size - 1);
         _dynamiteRow =
-            (local.dy / _cellSize).floor().clamp(0, BoardLogic.size - 1);
+            (gridLocal.dy / _cellSize).floor().clamp(0, BoardLogic.size - 1);
       }
     });
   }
@@ -406,8 +413,10 @@ class _GameScreenState extends State<GameScreen> {
     }
 
     final width = MediaQuery.sizeOf(context).width;
-    final boardSide = (width - 32).clamp(280.0, 420.0);
-    _cellSize = boardSide / BoardLogic.size;
+    // Reserve room for board frame inset so the grid isn't clipped.
+    final maxOuter = (width - 32).clamp(280.0, 420.0);
+    _cellSize =
+        (maxOuter - BoardWidget.contentInset * 2) / BoardLogic.size;
 
     final localPointer =
         _pointerGlobal == null ? null : _toRootLocal(_pointerGlobal!);
@@ -640,6 +649,7 @@ class _GameScreenState extends State<GameScreen> {
                   scoreKey: _scoreKey,
                   rootKey: _rootKey,
                   cellSize: _cellSize,
+                  boardInset: BoardWidget.contentInset,
                   onFinished: () {
                     if (mounted) {
                       setState(() => _activeFlights = []);

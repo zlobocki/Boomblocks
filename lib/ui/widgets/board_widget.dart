@@ -26,6 +26,9 @@ class BoardWidget extends StatefulWidget {
     this.dynamiteHoverCol,
   });
 
+  /// Inset between the gold frame and the playable grid (avoids border clip).
+  static const double contentInset = 3.0;
+
   final List<List<BoardCell>> board;
   final double cellSize;
   final PieceShape? previewShape;
@@ -39,6 +42,10 @@ class BoardWidget extends StatefulWidget {
   final VoidCallback? onShatterComplete;
   final int? dynamiteHoverRow;
   final int? dynamiteHoverCol;
+
+  /// Total widget side length for a given cell size (grid + inset).
+  static double outerSide(double cellSize) =>
+      cellSize * BoardLogic.size + contentInset * 2;
 
   @override
   State<BoardWidget> createState() => _BoardWidgetState();
@@ -93,15 +100,16 @@ class _BoardWidgetState extends State<BoardWidget>
 
   @override
   Widget build(BuildContext context) {
-    final side = widget.cellSize * BoardLogic.size;
+    final gridSide = widget.cellSize * BoardLogic.size;
+    final outer = BoardWidget.outerSide(widget.cellSize);
     return AnimatedBuilder(
       animation: Listenable.merge([_pulse, _shatter]),
       builder: (context, _) {
         final shatterT = Curves.easeOut.transform(_shatter.value);
         final shatterActive = _shatterActive;
         return Container(
-          width: side,
-          height: side,
+          width: outer,
+          height: outer,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
             gradient: const LinearGradient(
@@ -118,55 +126,61 @@ class _BoardWidgetState extends State<BoardWidget>
               ),
             ],
           ),
+          padding: const EdgeInsets.all(BoardWidget.contentInset),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Stack(
-              children: [
-                CustomPaint(
-                  size: Size(side, side),
-                  painter: _BoardPainter(
-                    board: widget.board,
-                    cellSize: widget.cellSize,
-                    previewShape: widget.previewShape,
-                    previewRow: widget.previewRow,
-                    previewCol: widget.previewCol,
-                    previewValid: widget.previewValid,
-                    highlightRows: widget.highlightRows,
-                    highlightCols: widget.highlightCols,
-                    pulse: _pulse.value,
-                    explodingCells: widget.explodingCells,
-                    shatter: shatterT,
-                    shatterActive: shatterActive,
-                    dynamiteHoverRow: widget.dynamiteHoverRow,
-                    dynamiteHoverCol: widget.dynamiteHoverCol,
+            borderRadius: BorderRadius.circular(14),
+            child: SizedBox(
+              width: gridSide,
+              height: gridSide,
+              child: Stack(
+                clipBehavior: Clip.hardEdge,
+                children: [
+                  CustomPaint(
+                    size: Size(gridSide, gridSide),
+                    painter: _BoardPainter(
+                      board: widget.board,
+                      cellSize: widget.cellSize,
+                      previewShape: widget.previewShape,
+                      previewRow: widget.previewRow,
+                      previewCol: widget.previewCol,
+                      previewValid: widget.previewValid,
+                      highlightRows: widget.highlightRows,
+                      highlightCols: widget.highlightCols,
+                      pulse: _pulse.value,
+                      explodingCells: widget.explodingCells,
+                      shatter: shatterT,
+                      shatterActive: shatterActive,
+                      dynamiteHoverRow: widget.dynamiteHoverRow,
+                      dynamiteHoverCol: widget.dynamiteHoverCol,
+                    ),
                   ),
-                ),
-                for (var r = 0; r < BoardLogic.size; r++)
-                  for (var c = 0; c < BoardLogic.size; c++)
-                    if (widget.board[r][c].hasGem &&
-                        !(shatterActive &&
-                            widget.explodingCells.contains((r, c)) &&
-                            shatterT > 0.2))
-                      Positioned(
-                        left: c * widget.cellSize + widget.cellSize * 0.12,
-                        top: r * widget.cellSize + widget.cellSize * 0.12,
-                        width: widget.cellSize * 0.76,
-                        height: widget.cellSize * 0.76,
-                        child: Opacity(
-                          opacity: shatterActive &&
-                                  widget.explodingCells.contains((r, c))
-                              ? (1 - shatterT).clamp(0.0, 1.0)
-                              : 1,
-                          child: Image.asset(
-                            GameAssets.gem(widget.board[r][c].gem!.name),
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.medium,
-                            errorBuilder: (_, __, ___) =>
-                                const SizedBox.shrink(),
+                  for (var r = 0; r < BoardLogic.size; r++)
+                    for (var c = 0; c < BoardLogic.size; c++)
+                      if (widget.board[r][c].hasGem &&
+                          !(shatterActive &&
+                              widget.explodingCells.contains((r, c)) &&
+                              shatterT > 0.2))
+                        Positioned(
+                          left: c * widget.cellSize + widget.cellSize * 0.12,
+                          top: r * widget.cellSize + widget.cellSize * 0.12,
+                          width: widget.cellSize * 0.76,
+                          height: widget.cellSize * 0.76,
+                          child: Opacity(
+                            opacity: shatterActive &&
+                                    widget.explodingCells.contains((r, c))
+                                ? (1 - shatterT).clamp(0.0, 1.0)
+                                : 1,
+                            child: Image.asset(
+                              GameAssets.gem(widget.board[r][c].gem!.name),
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.medium,
+                              errorBuilder: (_, __, ___) =>
+                                  const SizedBox.shrink(),
+                            ),
                           ),
                         ),
-                      ),
-              ],
+                ],
+              ),
             ),
           ),
         );

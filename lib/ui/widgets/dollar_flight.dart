@@ -13,6 +13,7 @@ class DollarFlightLayer extends StatefulWidget {
     required this.scoreKey,
     required this.rootKey,
     required this.cellSize,
+    this.boardInset = 0,
     required this.onFinished,
   });
 
@@ -22,6 +23,7 @@ class DollarFlightLayer extends StatefulWidget {
   final GlobalKey scoreKey;
   final GlobalKey rootKey;
   final double cellSize;
+  final double boardInset;
   final VoidCallback onFinished;
 
   @override
@@ -88,8 +90,12 @@ class _DollarFlightLayerState extends State<DollarFlightLayer>
     final paths = <_FlightPath>[];
     for (final f in widget.flights) {
       final startGlobal = Offset(
-        boardOrigin.dx + (f.col + 0.5) * widget.cellSize,
-        boardOrigin.dy + (f.row + 0.5) * widget.cellSize,
+        boardOrigin.dx +
+            widget.boardInset +
+            (f.col + 0.5) * widget.cellSize,
+        boardOrigin.dy +
+            widget.boardInset +
+            (f.row + 0.5) * widget.cellSize,
       );
       paths.add(_FlightPath(
         start: rootBox.globalToLocal(startGlobal),
