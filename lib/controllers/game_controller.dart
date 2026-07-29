@@ -10,6 +10,7 @@ import '../persistence/game_storage.dart';
 import '../systems/board_logic.dart';
 import '../systems/gem_spawner.dart';
 import '../systems/piece_generator.dart';
+import '../systems/puzzle_solver.dart';
 import '../systems/sound_service.dart';
 
 enum GameStatus { playing, disaster, exploding, gameOver }
@@ -111,11 +112,81 @@ class GameController extends ChangeNotifier {
   }
 
   void _dealTray() {
-    final dealt = _pieces.dealTrio(difficultyLevel);
-    tray = [dealt[0], dealt[1], dealt[2]];
+    tray = _dealSolvableTrio();
     piecesPlacedThisRound = 0;
     _undoSnapshot = null;
     _checkGameOver();
+  }
+
+  /// Deals a trio guaranteed (best effort) to have at least one sequential
+  /// solution from the current board, possibly requiring rope/dynamite the
+  /// player currently holds. Higher difficulty prefers deals with the fewest
+  /// solutions — ideally a single order-dependent sequence.
+  List<TrayPiece?> _dealSolvableTrio() {
+    const attempts = 10;
+    const countCap = 24;
+    // (trio, rawSolutionCount) — raw counts ignore consumables; 0 means the
+    // deal is solvable only by spending rope/dynamite.
+    final candidates = <(List<TrayPiece>, int)>[];
+
+    List<TrayPiece>? fallback;
+    for (var a = 0; a < attempts; a++) {
+      final trio = _pieces.dealTrio(difficultyLevel);
+      fallback ??= trio;
+      final raw = PuzzleSolver.countSolutions(
+        board,
+        trio,
+        limit: countCap,
+        nodeBudget: 60000,
+      );
+      if (raw > 0) {
+        candidates.add((trio, raw));
+        continue;
+      }
+      final withItems = PuzzleSolver.isSolvable(
+        board,
+        trio,
+        ropeCharges: inventory.rope.count,
+        dynamiteCharges: inventory.dynamite.count,
+        nodeBudget: 60000,
+      );
+      if (withItems) candidates.add((trio, 0));
+    }
+
+    if (candidates.isEmpty) {
+      // No solvable deal found within budget; keep the first roll and let the
+      // normal game-over logic take it from here.
+      return [fallback![0], fallback[1], fallback[2]];
+    }
+
+    // Sort by raw count ascending, treating consumable-dependent deals (0) as
+    // the hardest tier.
+    candidates.sort((a, b) {
+      int rank(int raw) => raw == 0 ? -1 : raw;
+      return rank(a.$2).compareTo(rank(b.$2));
+    });
+
+    List<TrayPiece> chosen;
+    if (difficultyLevel >= 6) {
+      // Hardest available: fewest solutions (single-solution when possible).
+      chosen = candidates
+          .firstWhere((c) => c.$2 == 1, orElse: () => candidates.first)
+          .$1;
+    } else if (difficultyLevel >= 3) {
+      chosen = candidates[candidates.length ~/ 2].$1;
+    } else {
+      // Early rounds: most forgiving deal.
+      chosen = candidates.last.$1;
+    }
+    return [chosen[0], chosen[1], chosen[2]];
+  }
+
+  /// Test hook: reseed the board at current difficulty and deal a new tray.
+  @visibleForTesting
+  void debugReseedAndDeal() {
+    board = BoardLogic.emptyBoard();
+    _seedBoard();
+    _dealTray();
   }
 
   void clearToasts() {
