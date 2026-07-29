@@ -33,7 +33,7 @@ class BoardCell {
           ? null
           : GemType.values.firstWhere(
               (g) => g.name == gemName,
-              orElse: () => GemType.coal,
+              orElse: () => gemName == 'coal' ? GemType.skull : GemType.skull,
             ),
       gemRoundsLeft: json['gemRoundsLeft'] as int? ?? 0,
     );

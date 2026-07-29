@@ -1,7 +1,9 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 
-/// Lightweight SFX player for clears.
+enum ClearSoundKind { zero, single, multi }
+
+/// Lightweight SFX player.
 class SoundService {
   SoundService._();
   static final SoundService instance = SoundService._();
@@ -13,7 +15,7 @@ class SoundService {
     if (_ready) return;
     try {
       await _player.setReleaseMode(ReleaseMode.stop);
-      await _player.setVolume(0.7);
+      await _player.setVolume(0.75);
       _ready = true;
     } catch (e) {
       debugPrint('SoundService init failed: $e');
@@ -30,9 +32,12 @@ class SoundService {
     }
   }
 
-  Future<void> playClear({required bool highScore}) => _play(
-        highScore ? 'sounds/great_success.mp3' : 'sounds/success.mp3',
-      );
+  Future<void> playClear(ClearSoundKind kind) => _play(switch (kind) {
+        ClearSoundKind.zero => 'sounds/clear_zero.mp3',
+        ClearSoundKind.single => 'sounds/clear_row.mp3',
+        ClearSoundKind.multi => 'sounds/clear_multi.mp3',
+      });
 
-  Future<void> playSadClear() => _play('sounds/sad.mp3');
+  Future<void> playGameOver({required bool top10}) =>
+      _play(top10 ? 'sounds/game_over_top10.mp3' : 'sounds/game_over.mp3');
 }

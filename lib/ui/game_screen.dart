@@ -31,6 +31,8 @@ class _GameScreenState extends State<GameScreen> {
   int? _previewRow;
   int? _previewCol;
   bool _previewValid = false;
+  Set<int> _highlightRows = {};
+  Set<int> _highlightCols = {};
   int? _dynamiteRow;
   int? _dynamiteCol;
 
@@ -39,6 +41,7 @@ class _GameScreenState extends State<GameScreen> {
   int? _ropeHoverTrayIndex;
   bool _showRopeMax = false;
   bool _showDynMax = false;
+  bool _showUndoMax = false;
   bool _gameOverShown = false;
 
   int? _dragTrayIndex;
@@ -89,11 +92,13 @@ class _GameScreenState extends State<GameScreen> {
         _showRopeMax = c.inventory.rope.count >= c.inventory.rope.maxCount;
         _showDynMax =
             c.inventory.dynamite.count >= c.inventory.dynamite.maxCount;
+        _showUndoMax = c.inventory.undo.count >= c.inventory.undo.maxCount;
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
             setState(() {
               _showRopeMax = false;
               _showDynMax = false;
+              _showUndoMax = false;
             });
             c.clearToasts();
           }
@@ -141,12 +146,27 @@ class _GameScreenState extends State<GameScreen> {
         _previewRow = null;
         _previewCol = null;
         _previewValid = false;
+        _highlightRows = {};
+        _highlightCols = {};
       } else {
         _previewShape = piece.shape;
         _previewRow = originRow;
         _previewCol = originCol;
         _previewValid =
             BoardLogic.canPlace(c.board, piece.shape, originRow, originCol);
+        if (_previewValid) {
+          final preview = BoardLogic.previewClearLines(
+            c.board,
+            piece.shape,
+            originRow,
+            originCol,
+          );
+          _highlightRows = preview.rows.toSet();
+          _highlightCols = preview.cols.toSet();
+        } else {
+          _highlightRows = {};
+          _highlightCols = {};
+        }
       }
     });
   }
@@ -208,6 +228,8 @@ class _GameScreenState extends State<GameScreen> {
       _previewRow = null;
       _previewCol = null;
       _previewValid = false;
+      _highlightRows = {};
+      _highlightCols = {};
       _dynamiteRow = null;
       _dynamiteCol = null;
       _draggingRope = false;
@@ -252,7 +274,10 @@ class _GameScreenState extends State<GameScreen> {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text(
             'Game Over',
-            style: GoogleFonts.fredoka(fontWeight: FontWeight.w600),
+            style: GoogleFonts.fredoka(
+              fontWeight: FontWeight.w600,
+              color: BoomColors.gold,
+            ),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -263,21 +288,34 @@ class _GameScreenState extends State<GameScreen> {
                 style: GoogleFonts.nunito(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
+                  color: BoomColors.cream,
                 ),
               ),
               if (qualifies) ...[
                 const SizedBox(height: 12),
                 Text(
                   'You made the top 10! Enter your name:',
-                  style: GoogleFonts.nunito(fontWeight: FontWeight.w600),
+                  style: GoogleFonts.nunito(
+                    fontWeight: FontWeight.w600,
+                    color: BoomColors.dust,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: nameCtrl,
                   maxLength: 12,
-                  decoration: const InputDecoration(
+                  style: const TextStyle(color: BoomColors.cream),
+                  decoration: InputDecoration(
                     hintText: 'Name',
-                    border: OutlineInputBorder(),
+                    hintStyle: TextStyle(
+                      color: BoomColors.dust.withValues(alpha: 0.6),
+                    ),
+                    border: const OutlineInputBorder(),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: BoomColors.frameGold.withValues(alpha: 0.5),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -355,6 +393,10 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
+  Set<(int, int)> get _explodingCellSet => {
+        for (final p in c.explodingCells) (p.y, p.x),
+      };
+
   @override
   Widget build(BuildContext context) {
     if (!c.loaded) {
@@ -380,9 +422,9 @@ class _GameScreenState extends State<GameScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
+              Color(0xFF241810),
               BoomColors.skyTop,
               BoomColors.skyBottom,
-              Color(0xFFE8C9A0),
             ],
           ),
         ),
@@ -413,6 +455,10 @@ class _GameScreenState extends State<GameScreen> {
                           previewRow: _previewRow,
                           previewCol: _previewCol,
                           previewValid: _previewValid,
+                          highlightRows: _highlightRows,
+                          highlightCols: _highlightCols,
+                          explodingCells: _explodingCellSet,
+                          explosionEventId: c.explosionEventId,
                           dynamiteHoverRow:
                               _draggingDynamite ? _dynamiteRow : null,
                           dynamiteHoverCol:
@@ -430,10 +476,10 @@ class _GameScreenState extends State<GameScreen> {
                         horizontal: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: BoomColors.tray.withValues(alpha: 0.92),
+                        color: BoomColors.tray.withValues(alpha: 0.95),
                         borderRadius: BorderRadius.circular(22),
                         border: Border.all(
-                          color: BoomColors.earth.withValues(alpha: 0.45),
+                          color: BoomColors.frameGold.withValues(alpha: 0.45),
                         ),
                       ),
                       child: LayoutBuilder(
@@ -447,7 +493,8 @@ class _GameScreenState extends State<GameScreen> {
                             children: List.generate(3, (i) {
                               final piece = c.tray[i];
                               return Padding(
-                                padding: EdgeInsets.only(left: i == 0 ? 0 : gap),
+                                padding:
+                                    EdgeInsets.only(left: i == 0 ? 0 : gap),
                                 child: SizedBox(
                                   key: _trayKeys[i],
                                   width: slotW,
@@ -508,7 +555,7 @@ class _GameScreenState extends State<GameScreen> {
                           onDragUpdate: _updateRopeHover,
                           onDragEnd: _endRopeDrag,
                         ),
-                        const SizedBox(width: 28),
+                        const SizedBox(width: 18),
                         ItemSlot(
                           label: 'Dynamite',
                           assetPath: GameAssets.dynamite,
@@ -526,13 +573,22 @@ class _GameScreenState extends State<GameScreen> {
                           onDragUpdate: _updateDynamiteSnap,
                           onDragEnd: _endDynamiteDrag,
                         ),
+                        const SizedBox(width: 18),
+                        ItemSlot(
+                          label: 'Undo',
+                          assetPath: GameAssets.undo,
+                          meter: c.inventory.undo,
+                          accent: BoomColors.undo,
+                          showMax: _showUndoMax,
+                          enabled: c.canUndoPlacement,
+                          onTap: () => c.undoLastPlacement(),
+                        ),
                       ],
                     ),
                   ),
                 ],
               ),
             ),
-            // Floating piece / item under finger
             if (draggingPiece != null && localPointer != null)
               Positioned(
                 left: localPointer.dx -
@@ -590,6 +646,48 @@ class _GameScreenState extends State<GameScreen> {
                   },
                 ),
               ),
+            if (c.status == GameStatus.disaster ||
+                c.status == GameStatus.exploding)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Container(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    alignment: Alignment.center,
+                    child: AnimatedOpacity(
+                      opacity: c.status == GameStatus.disaster ? 1 : 0.85,
+                      duration: const Duration(milliseconds: 250),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Disaster!',
+                            style: GoogleFonts.fredoka(
+                              fontSize: 42,
+                              fontWeight: FontWeight.w700,
+                              color: BoomColors.danger,
+                              shadows: const [
+                                Shadow(
+                                  blurRadius: 12,
+                                  color: Colors.black,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'No more moves.',
+                            style: GoogleFonts.nunito(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              color: BoomColors.cream,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -632,11 +730,13 @@ class _TraySlot extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: highlighted
-            ? BoomColors.rope.withValues(alpha: 0.15)
-            : Colors.white.withValues(alpha: 0.35),
+            ? BoomColors.rope.withValues(alpha: 0.18)
+            : const Color(0xFF2A221C),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: highlighted ? BoomColors.rope : Colors.transparent,
+          color: highlighted
+              ? BoomColors.rope
+              : BoomColors.frameGold.withValues(alpha: 0.25),
           width: 2,
         ),
       ),
@@ -653,8 +753,6 @@ class _TraySlot extends StatelessWidget {
     );
 
     if (p != null) {
-      // Immediate pan-drag (no long-press). Tap still works for rope rotate
-      // when the finger doesn't move past touch slop.
       child = GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,

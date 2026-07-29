@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 
 import '../models/cell.dart';
@@ -10,7 +12,25 @@ import '../systems/gem_spawner.dart';
 import '../systems/piece_generator.dart';
 import '../systems/sound_service.dart';
 
-enum GameStatus { playing, gameOver }
+enum GameStatus { playing, disaster, exploding, gameOver }
+
+class PlacementSnapshot {
+  PlacementSnapshot({
+    required this.board,
+    required this.tray,
+    required this.score,
+    required this.gemsCollectedTowardReset,
+    required this.piecesPlacedThisRound,
+    required this.inventory,
+  });
+
+  final List<List<BoardCell>> board;
+  final List<TrayPiece?> tray;
+  final int score;
+  final int gemsCollectedTowardReset;
+  final int piecesPlacedThisRound;
+  final Inventory inventory;
+}
 
 class GameController extends ChangeNotifier {
   GameController({GameStorage? storage}) : _storage = storage ?? GameStorage();
@@ -31,15 +51,23 @@ class GameController extends ChangeNotifier {
   String? lastScoreToast;
   bool loaded = false;
 
-  /// Collectibles cleared toward the next loot refresh (0..lootResetAt).
   int gemsCollectedTowardReset = 0;
-  static const lootResetAt = 10;
+  static const lootResetAt = GemSpawner.lootResetAt;
 
   List<CollectedGem> pendingGemFlights = [];
   int clearEventId = 0;
 
+  /// Cells currently playing shatter animation.
+  List<Point<int>> explodingCells = [];
+  int explosionEventId = 0;
+
+  PlacementSnapshot? _undoSnapshot;
+  bool get canUndoPlacement =>
+      status == GameStatus.playing &&
+      _undoSnapshot != null &&
+      inventory.undo.count > 0;
+
   static const clearBoardBonusBase = 250;
-  static const highScoreClearThreshold = 40;
 
   Future<void> init({bool forceNew = false}) async {
     await SoundService.instance.init();
@@ -67,6 +95,8 @@ class GameController extends ChangeNotifier {
     maxToast = null;
     lastScoreToast = null;
     pendingGemFlights = [];
+    explodingCells = [];
+    _undoSnapshot = null;
     _seedBoard();
     _dealTray();
     loaded = true;
@@ -75,8 +105,8 @@ class GameController extends ChangeNotifier {
   }
 
   void _seedBoard() {
-    BoardLogic.prefillBoard(board, targetCells: 24 + difficultyLevel * 2);
-    _gems.spawnWave(board, difficultyLevel);
+    BoardLogic.prefillBoard(board, targetCells: 26 + difficultyLevel * 2);
+    _gems.spawnWave(board, round);
     gemsCollectedTowardReset = 0;
   }
 
@@ -84,6 +114,7 @@ class GameController extends ChangeNotifier {
     final dealt = _pieces.dealTrio(difficultyLevel);
     tray = [dealt[0], dealt[1], dealt[2]];
     piecesPlacedThisRound = 0;
+    _undoSnapshot = null;
     _checkGameOver();
   }
 
@@ -94,6 +125,63 @@ class GameController extends ChangeNotifier {
 
   void consumeGemFlights() {
     pendingGemFlights = [];
+  }
+
+  void clearExplosion() {
+    explodingCells = [];
+  }
+
+  PlacementSnapshot _captureSnapshot() {
+    return PlacementSnapshot(
+      board: BoardLogic.cloneBoard(board),
+      tray: tray.map((p) => p?.copy()).toList(),
+      score: score,
+      gemsCollectedTowardReset: gemsCollectedTowardReset,
+      piecesPlacedThisRound: piecesPlacedThisRound,
+      inventory: Inventory(
+        rope: inventory.rope.copy(),
+        dynamite: inventory.dynamite.copy(),
+        undo: inventory.undo.copy(),
+      ),
+    );
+  }
+
+  bool undoLastPlacement() {
+    if (!canUndoPlacement) return false;
+    final snap = _undoSnapshot!;
+    if (!inventory.undo.tryConsume()) return false;
+
+    board = BoardLogic.cloneBoard(snap.board);
+    tray = snap.tray.map((p) => p?.copy()).toList();
+    while (tray.length < 3) {
+      tray.add(null);
+    }
+    score = snap.score;
+    gemsCollectedTowardReset = snap.gemsCollectedTowardReset;
+    piecesPlacedThisRound = snap.piecesPlacedThisRound;
+    // Restore meters except undo count (already consumed current).
+    final undoLeft = inventory.undo.count;
+    final undoProgress = inventory.undo.progress;
+    final undoThreshold = inventory.undo.threshold;
+    final undoTier = inventory.undo.tier;
+    inventory = Inventory(
+      rope: snap.inventory.rope.copy(),
+      dynamite: snap.inventory.dynamite.copy(),
+      undo: ItemMeter(
+        count: undoLeft,
+        progress: undoProgress,
+        threshold: undoThreshold,
+        tier: undoTier,
+      ),
+    );
+    _undoSnapshot = null;
+    lastScoreToast = 'Undone';
+    pendingGemFlights = [];
+    explodingCells = [];
+    _checkGameOver();
+    _persist();
+    notifyListeners();
+    return true;
   }
 
   bool applyRopeToPiece(int trayIndex) {
@@ -116,17 +204,13 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool canPlaceAt(int trayIndex, int row, int col) {
-    final piece = tray[trayIndex];
-    if (piece == null) return false;
-    return BoardLogic.canPlace(board, piece.shape, row, col);
-  }
-
   bool placePiece(int trayIndex, int row, int col) {
     if (status != GameStatus.playing) return false;
     final piece = tray[trayIndex];
     if (piece == null) return false;
     if (!BoardLogic.canPlace(board, piece.shape, row, col)) return false;
+
+    _undoSnapshot = _captureSnapshot();
 
     BoardLogic.placePiece(board, piece.shape, row, col);
     tray[trayIndex] = null;
@@ -135,6 +219,7 @@ class GameController extends ChangeNotifier {
     final clear = BoardLogic.clearCompletedLines(board);
     _handleClearResult(clear);
     _handleClearBoardBonus();
+    _maybeRespawnLootIfEmpty();
 
     if (piecesPlacedThisRound >= 3 || tray.every((p) => p == null)) {
       _endRound();
@@ -150,10 +235,13 @@ class GameController extends ChangeNotifier {
   bool useDynamite(int row, int col) {
     if (status != GameStatus.playing) return false;
     if (!inventory.dynamite.tryConsume()) return false;
+    // Dynamite is not undoable as a placement.
+    _undoSnapshot = null;
 
     final result = BoardLogic.clearDynamite(board, row, col);
     _handleClearResult(result);
     _handleClearBoardBonus();
+    _maybeRespawnLootIfEmpty();
     _checkGameOver();
     _persist();
     notifyListeners();
@@ -165,23 +253,25 @@ class GameController extends ChangeNotifier {
         clear.linesCleared > 0 || clear.clearedCells.isNotEmpty;
     if (didClear) {
       if (clear.score <= 0) {
-        SoundService.instance.playSadClear();
+        SoundService.instance.playClear(ClearSoundKind.zero);
+      } else if (clear.linesCleared >= 2) {
+        SoundService.instance.playClear(ClearSoundKind.multi);
       } else {
-        final high = clear.score >= highScoreClearThreshold ||
-            clear.linesCleared >= 2 ||
-            clear.collectedGems.any((g) => g.points >= 25);
-        SoundService.instance.playClear(highScore: high);
+        SoundService.instance.playClear(ClearSoundKind.single);
       }
     }
 
-    // Dollar trails only for gems that actually pay.
+    if (clear.clearedCells.isNotEmpty) {
+      explodingCells = List.of(clear.clearedCells);
+      explosionEventId++;
+    }
+
     final paying = clear.collectedGems.where((g) => g.points > 0).toList();
     if (paying.isNotEmpty) {
       pendingGemFlights = paying;
       clearEventId++;
     }
 
-    // Every collectible (including coal) advances the loot reset counter.
     if (clear.collectedGems.isNotEmpty) {
       gemsCollectedTowardReset += clear.collectedGems.length;
       if (gemsCollectedTowardReset >= lootResetAt) {
@@ -193,9 +283,16 @@ class GameController extends ChangeNotifier {
     _applyScore(clear.score, clear.linesCleared, clear.gemValueSum);
   }
 
+  void _maybeRespawnLootIfEmpty() {
+    if (_gems.countGemsOnBoard(board) == 0 && !BoardLogic.isEmpty(board)) {
+      gemsCollectedTowardReset = 0;
+      _refreshLootWave();
+    }
+  }
+
   void _refreshLootWave() {
     _gems.clearAllGems(board);
-    _gems.spawnWave(board, difficultyLevel);
+    _gems.spawnWave(board, round);
     lastScoreToast = 'New loot!';
   }
 
@@ -204,9 +301,7 @@ class GameController extends ChangeNotifier {
     final bonus = clearBoardBonusBase * difficultyLevel;
     score += bonus;
     lastScoreToast = 'BOARD CLEAR! +\$$bonus';
-    final ropeMax = inventory.rope.addScore(bonus);
-    final dynMax = inventory.dynamite.addScore(bonus);
-    if (ropeMax || dynMax) maxToast = 'MAX';
+    _feedMeters(bonus);
     _seedBoard();
   }
 
@@ -216,12 +311,14 @@ class GameController extends ChangeNotifier {
     lastScoreToast = lines > 1
         ? '+\$$gained  ($lines×\$$gemSum)'
         : '+\$$gained';
+    _feedMeters(gained);
+  }
 
-    final ropeMax = inventory.rope.addScore(gained);
-    final dynMax = inventory.dynamite.addScore(gained);
-    if (ropeMax || dynMax) {
-      maxToast = 'MAX';
-    }
+  void _feedMeters(int points) {
+    final ropeMax = inventory.rope.addScore(points);
+    final dynMax = inventory.dynamite.addScore(points);
+    final undoMax = inventory.undo.addScore(points);
+    if (ropeMax || dynMax || undoMax) maxToast = 'MAX';
   }
 
   void _endRound() {
@@ -229,21 +326,65 @@ class GameController extends ChangeNotifier {
       difficultyLevel++;
     }
     round++;
-    // Loot no longer refreshes on round end — only after 10 collects.
+    _undoSnapshot = null;
     _dealTray();
   }
 
   void _checkGameOver() {
+    if (status != GameStatus.playing) return;
     final remaining = tray.whereType<TrayPiece>().toList();
     if (remaining.isEmpty) return;
 
-    final anyPlaceable =
-        remaining.any((p) => BoardLogic.canPlaceAnywhere(board, p));
+    final considerRotations = inventory.rope.count > 0;
+    final anyPlaceable = remaining.any(
+      (p) => BoardLogic.canPlaceAnywhere(
+        board,
+        p,
+        allRotations: considerRotations || p.hasRope,
+      ),
+    );
     if (anyPlaceable) return;
 
-    if (inventory.rope.count > 0 || inventory.dynamite.count > 0) return;
+    // Rope left but still no fit → still game over unless dynamite/undo remain.
+    if (inventory.dynamite.count > 0 || inventory.undo.count > 0) return;
 
+    _startDisasterSequence();
+  }
+
+  Future<void> _startDisasterSequence() async {
+    status = GameStatus.disaster;
+    _undoSnapshot = null;
+    notifyListeners();
+
+    await Future<void>.delayed(const Duration(milliseconds: 1100));
+    if (status != GameStatus.disaster) return;
+
+    final cells = <Point<int>>[];
+    for (var r = 0; r < BoardLogic.size; r++) {
+      for (var c = 0; c < BoardLogic.size; c++) {
+        if (board[r][c].filled) cells.add(Point(c, r));
+      }
+    }
+    explodingCells = cells;
+    explosionEventId++;
+    status = GameStatus.exploding;
+    notifyListeners();
+
+    final qualifies = await _storage.qualifiesForTop10(score);
+    SoundService.instance.playGameOver(top10: qualifies);
+
+    await Future<void>.delayed(const Duration(milliseconds: 900));
+    if (status != GameStatus.exploding) return;
+
+    for (final row in board) {
+      for (final cell in row) {
+        cell.clear();
+      }
+    }
+    explodingCells = [];
     status = GameStatus.gameOver;
+    await _storage.clearGame();
+    notifyListeners();
   }
 
   Future<bool> qualifiesForScoreboard() => _storage.qualifiesForTop10(score);
@@ -264,8 +405,9 @@ class GameController extends ChangeNotifier {
   }
 
   Future<void> _persist() async {
-    if (status == GameStatus.gameOver) {
-      await _storage.clearGame();
+    if (status == GameStatus.gameOver ||
+        status == GameStatus.disaster ||
+        status == GameStatus.exploding) {
       return;
     }
     await _storage.saveGame(toJson());
@@ -281,7 +423,7 @@ class GameController extends ChangeNotifier {
         'difficultyLevel': difficultyLevel,
         'piecesPlacedThisRound': piecesPlacedThisRound,
         'gemsCollectedTowardReset': gemsCollectedTowardReset,
-        'status': status.name,
+        'status': GameStatus.playing.name,
       };
 
   void _fromJson(Map<String, dynamic> json) {
@@ -304,9 +446,7 @@ class GameController extends ChangeNotifier {
     difficultyLevel = json['difficultyLevel'] as int? ?? 1;
     piecesPlacedThisRound = json['piecesPlacedThisRound'] as int? ?? 0;
     gemsCollectedTowardReset = json['gemsCollectedTowardReset'] as int? ?? 0;
-    status = GameStatus.values.firstWhere(
-      (s) => s.name == json['status'],
-      orElse: () => GameStatus.playing,
-    );
+    status = GameStatus.playing;
+    _undoSnapshot = null;
   }
 }

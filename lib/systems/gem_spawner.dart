@@ -9,7 +9,19 @@ class GemSpawner {
 
   final Random _rng;
 
-  static const minWaveSize = 10;
+  static const waveSize = 12;
+  static const lootResetAt = 7;
+
+  /// Unlock schedule by round number (1-based):
+  /// 1–4 silver; 5+ gold; 10+ emerald; 16+ ruby; 23+ diamond.
+  static List<GemType> valuablesForRound(int round) {
+    final list = <GemType>[GemType.silver];
+    if (round >= 5) list.add(GemType.gold);
+    if (round >= 10) list.add(GemType.emerald);
+    if (round >= 16) list.add(GemType.ruby);
+    if (round >= 23) list.add(GemType.diamond);
+    return list;
+  }
 
   int countGemsOnBoard(List<List<BoardCell>> board) {
     var n = 0;
@@ -21,7 +33,6 @@ class GemSpawner {
     return n;
   }
 
-  /// Remove every collectible currently on the board.
   void clearAllGems(List<List<BoardCell>> board) {
     for (final row in board) {
       for (final cell in row) {
@@ -33,9 +44,8 @@ class GemSpawner {
     }
   }
 
-  /// Spawn a wave: at least [minWaveSize] items when possible, half coal.
-  /// Returns how many gems were placed.
-  int spawnWave(List<List<BoardCell>> board, int difficultyLevel) {
+  /// Spawn up to 12 loot items (half worthless fossils), respecting unlock curve.
+  int spawnWave(List<List<BoardCell>> board, int round) {
     final candidates = <Point<int>>[];
     for (var r = 0; r < BoardLogic.size; r++) {
       for (var c = 0; c < BoardLogic.size; c++) {
@@ -48,9 +58,8 @@ class GemSpawner {
     if (candidates.isEmpty) return 0;
 
     candidates.shuffle(_rng);
-    final placeCount = min(candidates.length, max(minWaveSize, 10));
-
-    final types = _buildWaveTypes(placeCount, difficultyLevel);
+    final placeCount = min(candidates.length, waveSize);
+    final types = _buildWaveTypes(placeCount, round);
     for (var i = 0; i < placeCount; i++) {
       final p = candidates[i];
       board[p.y][p.x].setGem(types[i], rounds: 99);
@@ -58,36 +67,17 @@ class GemSpawner {
     return placeCount;
   }
 
-  /// Half coal (rounded down), remainder valuable gems by difficulty.
-  List<GemType> _buildWaveTypes(int count, int difficultyLevel) {
-    final coalCount = count ~/ 2;
-    final valuableCount = count - coalCount;
+  List<GemType> _buildWaveTypes(int count, int round) {
+    final worthlessCount = count ~/ 2; // at least half
+    final valuableCount = count - worthlessCount;
+    final valuables = valuablesForRound(round);
     final types = <GemType>[
-      ...List.filled(coalCount, GemType.coal),
-      for (var i = 0; i < valuableCount; i++) _pickValuable(difficultyLevel),
+      for (var i = 0; i < worthlessCount; i++)
+        _rng.nextBool() ? GemType.skull : GemType.bones,
+      for (var i = 0; i < valuableCount; i++)
+        valuables[_rng.nextInt(valuables.length)],
     ];
     types.shuffle(_rng);
     return types;
-  }
-
-  GemType _pickValuable(int level) {
-    final roll = _rng.nextDouble();
-    if (level <= 2) {
-      if (roll < 0.55) return GemType.silver;
-      if (roll < 0.85) return GemType.gold;
-      return GemType.emerald;
-    }
-    if (level <= 5) {
-      if (roll < 0.30) return GemType.silver;
-      if (roll < 0.55) return GemType.gold;
-      if (roll < 0.80) return GemType.emerald;
-      if (roll < 0.95) return GemType.ruby;
-      return GemType.diamond;
-    }
-    if (roll < 0.20) return GemType.silver;
-    if (roll < 0.40) return GemType.gold;
-    if (roll < 0.65) return GemType.emerald;
-    if (roll < 0.85) return GemType.ruby;
-    return GemType.diamond;
   }
 }

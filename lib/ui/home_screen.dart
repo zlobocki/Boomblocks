@@ -96,9 +96,18 @@ class _HomeScreenState extends State<HomeScreen> {
                           final ok = await showDialog<bool>(
                             context: context,
                             builder: (ctx) => AlertDialog(
-                              title: const Text('New game?'),
-                              content: const Text(
+                              backgroundColor: BoomColors.hud,
+                              title: Text(
+                                'New game?',
+                                style: GoogleFonts.fredoka(
+                                  color: BoomColors.gold,
+                                ),
+                              ),
+                              content: Text(
                                 'This will replace your saved run.',
+                                style: GoogleFonts.nunito(
+                                  color: BoomColors.cream,
+                                ),
                               ),
                               actions: [
                                 TextButton(
@@ -120,7 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       },
                       style: _hasSave
                           ? ElevatedButton.styleFrom(
-                              backgroundColor: BoomColors.earthDark,
+                              backgroundColor: BoomColors.earth,
                             )
                           : null,
                       child: Text(_hasSave ? 'New game' : 'Play'),

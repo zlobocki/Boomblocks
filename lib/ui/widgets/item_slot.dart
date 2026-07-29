@@ -11,9 +11,10 @@ class ItemSlot extends StatelessWidget {
     required this.assetPath,
     required this.meter,
     required this.accent,
-    required this.onDragStart,
-    required this.onDragUpdate,
-    required this.onDragEnd,
+    this.onTap,
+    this.onDragStart,
+    this.onDragUpdate,
+    this.onDragEnd,
     this.dragging = false,
     this.enabled = true,
     this.showMax = false,
@@ -23,16 +24,18 @@ class ItemSlot extends StatelessWidget {
   final String assetPath;
   final ItemMeter meter;
   final Color accent;
-  final void Function(Offset global) onDragStart;
-  final void Function(Offset global) onDragUpdate;
-  final VoidCallback onDragEnd;
+  final VoidCallback? onTap;
+  final void Function(Offset global)? onDragStart;
+  final void Function(Offset global)? onDragUpdate;
+  final VoidCallback? onDragEnd;
   final bool dragging;
   final bool enabled;
   final bool showMax;
 
   @override
   Widget build(BuildContext context) {
-    final canDrag = enabled && meter.count > 0;
+    final canUse = enabled && meter.count > 0;
+    final canDrag = canUse && onDragStart != null;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -41,16 +44,17 @@ class ItemSlot extends StatelessWidget {
           children: [
             GestureDetector(
               behavior: HitTestBehavior.opaque,
+              onTap: canUse && onTap != null ? onTap : null,
               onPanStart: !canDrag
                   ? null
-                  : (d) => onDragStart(d.globalPosition),
-              onPanUpdate: !canDrag
+                  : (d) => onDragStart!(d.globalPosition),
+              onPanUpdate: !canDrag || onDragUpdate == null
                   ? null
-                  : (d) => onDragUpdate(d.globalPosition),
-              onPanEnd: !canDrag ? null : (_) => onDragEnd(),
-              onPanCancel: !canDrag ? null : onDragEnd,
+                  : (d) => onDragUpdate!(d.globalPosition),
+              onPanEnd: !canDrag || onDragEnd == null ? null : (_) => onDragEnd!(),
+              onPanCancel: !canDrag || onDragEnd == null ? null : onDragEnd,
               child: Opacity(
-                opacity: dragging ? 0.35 : (canDrag ? 1 : 0.45),
+                opacity: dragging ? 0.35 : (canUse ? 1 : 0.45),
                 child: _IconBadge(
                   assetPath: assetPath,
                   accent: accent,
@@ -77,7 +81,7 @@ class ItemSlot extends StatelessWidget {
                 style: GoogleFonts.nunito(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: BoomColors.ink.withValues(alpha: 0.75),
+                  color: BoomColors.cream.withValues(alpha: 0.85),
                 ),
               ),
               const SizedBox(height: 4),
@@ -96,7 +100,7 @@ class ItemSlot extends StatelessWidget {
                 style: GoogleFonts.nunito(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
-                  color: BoomColors.ink.withValues(alpha: 0.55),
+                  color: BoomColors.dust.withValues(alpha: 0.75),
                 ),
               ),
             ],
@@ -143,7 +147,7 @@ class _IconBadge extends StatelessWidget {
               decoration: BoxDecoration(
                 color: accent,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.white, width: 1.5),
+                border: Border.all(color: BoomColors.ink, width: 1.5),
               ),
               child: Text(
                 '$count/$maxCount',

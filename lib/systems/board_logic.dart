@@ -72,10 +72,11 @@ class BoardLogic {
 
   static bool canPlaceAnywhere(
     List<List<BoardCell>> board,
-    TrayPiece piece,
-  ) {
+    TrayPiece piece, {
+    bool allRotations = false,
+  }) {
     final orientations = <PieceShape>[piece.shape];
-    if (piece.hasRope) {
+    if (piece.hasRope || allRotations) {
       var s = piece.shape;
       for (var i = 0; i < 3; i++) {
         s = s.rotated90();
@@ -90,6 +91,36 @@ class BoardLogic {
       }
     }
     return false;
+  }
+
+  /// Rows/cols that would complete if [shape] were placed at origin.
+  static ({List<int> rows, List<int> cols}) previewClearLines(
+    List<List<BoardCell>> board,
+    PieceShape shape,
+    int originRow,
+    int originCol,
+  ) {
+    if (!canPlace(board, shape, originRow, originCol)) {
+      return (rows: <int>[], cols: <int>[]);
+    }
+    final clone = cloneBoard(board);
+    placePiece(clone, shape, originRow, originCol);
+    final rows = <int>[];
+    final cols = <int>[];
+    for (var r = 0; r < size; r++) {
+      if (clone[r].every((c) => c.filled)) rows.add(r);
+    }
+    for (var c = 0; c < size; c++) {
+      var full = true;
+      for (var r = 0; r < size; r++) {
+        if (!clone[r][c].filled) {
+          full = false;
+          break;
+        }
+      }
+      if (full) cols.add(c);
+    }
+    return (rows: rows, cols: cols);
   }
 
   /// True if every remaining tray piece has at least one legal placement.

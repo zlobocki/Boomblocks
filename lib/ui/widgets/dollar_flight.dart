@@ -177,9 +177,9 @@ class _FlightLabel extends StatelessWidget {
               fontSize: 18,
               fontWeight: FontWeight.w900,
               color: BoomColors.success,
-              shadows: [
+              shadows: const [
                 Shadow(
-                  color: Colors.white.withValues(alpha: 0.9),
+                  color: Color(0xCC000000),
                   blurRadius: 6,
                 ),
               ],

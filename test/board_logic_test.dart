@@ -26,23 +26,23 @@ void main() {
         board[0][c].placeEarth();
       }
       board[0][0].setGem(GemType.gold); // 10
-      board[0][1].setGem(GemType.coal); // 0
+      board[0][1].setGem(GemType.skull); // 0
       final result = BoardLogic.clearCompletedLines(board);
       expect(result.rowsCleared, 1);
       expect(result.colsCleared, 0);
       expect(result.gemValueSum, 10);
       expect(result.score, 10);
-      expect(result.collectedGems.length, 2); // coal still counts as collected
+      expect(result.collectedGems.length, 2); // fossils still count as collected
       expect(board[0].every((c) => !c.filled), isTrue);
     });
 
-    test('coal-only clear scores zero', () {
+    test('fossil-only clear scores zero', () {
       final board = BoardLogic.emptyBoard();
       for (var c = 0; c < 8; c++) {
         board[0][c].placeEarth();
       }
-      board[0][0].setGem(GemType.coal);
-      board[0][1].setGem(GemType.coal);
+      board[0][0].setGem(GemType.skull);
+      board[0][1].setGem(GemType.bones);
       final result = BoardLogic.clearCompletedLines(board);
       expect(result.score, 0);
       expect(result.collectedGems.length, 2);
@@ -175,7 +175,7 @@ void main() {
   });
 
   group('GemSpawner', () {
-    test('wave places at least 10 gems with half coal', () {
+    test('wave places up to 12 gems with half fossils', () {
       final board = BoardLogic.emptyBoard();
       // Fill enough earth for a full wave
       for (var r = 0; r < 8; r++) {
@@ -185,18 +185,20 @@ void main() {
       }
       final spawner = GemSpawner(Random(42));
       final placed = spawner.spawnWave(board, 1);
-      expect(placed, greaterThanOrEqualTo(10));
-      var coal = 0;
+      expect(placed, GemSpawner.waveSize);
+      var fossils = 0;
       var total = 0;
       for (final row in board) {
         for (final cell in row) {
           if (!cell.hasGem) continue;
           total++;
-          if (cell.gem == GemType.coal) coal++;
+          if (cell.gem == GemType.skull || cell.gem == GemType.bones) {
+            fossils++;
+          }
         }
       }
       expect(total, placed);
-      expect(coal, placed ~/ 2);
+      expect(fossils, placed ~/ 2);
     });
   });
 }

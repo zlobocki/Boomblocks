@@ -16,7 +16,6 @@ class ItemMeter {
   double get progressRatio =>
       threshold <= 0 ? 0 : (progress / threshold).clamp(0.0, 1.0);
 
-  /// Returns true if a MAX popup should show.
   bool addScore(int points) {
     if (points <= 0) return false;
     var showMax = false;
@@ -41,7 +40,6 @@ class ItemMeter {
   }
 
   static int nextThreshold(int tier) {
-    // 50, 70, 95, 125, 160, ...
     var t = 50;
     for (var i = 0; i < tier; i++) {
       t += 20 + i * 5;
@@ -78,16 +76,19 @@ class Inventory {
   Inventory({
     ItemMeter? rope,
     ItemMeter? dynamite,
+    ItemMeter? undo,
   })  : rope = rope ?? ItemMeter(count: 1, threshold: 50),
-        dynamite = dynamite ??
-            ItemMeter(count: 1, threshold: 65); // offset so meters desync
+        dynamite = dynamite ?? ItemMeter(count: 1, threshold: 65),
+        undo = undo ?? ItemMeter(count: 1, threshold: 80);
 
   final ItemMeter rope;
   final ItemMeter dynamite;
+  final ItemMeter undo;
 
   Map<String, dynamic> toJson() => {
         'rope': rope.toJson(),
         'dynamite': dynamite.toJson(),
+        'undo': undo.toJson(),
       };
 
   factory Inventory.fromJson(Map<String, dynamic> json) => Inventory(
@@ -95,5 +96,7 @@ class Inventory {
             Map<String, dynamic>.from(json['rope'] as Map? ?? {})),
         dynamite: ItemMeter.fromJson(
             Map<String, dynamic>.from(json['dynamite'] as Map? ?? {})),
+        undo: ItemMeter.fromJson(
+            Map<String, dynamic>.from(json['undo'] as Map? ?? {})),
       );
 }

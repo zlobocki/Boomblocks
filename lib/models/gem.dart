@@ -1,5 +1,6 @@
 enum GemType {
-  coal,
+  skull,
+  bones,
   silver,
   gold,
   emerald,
@@ -9,7 +10,8 @@ enum GemType {
 
 extension GemTypeX on GemType {
   int get value => switch (this) {
-        GemType.coal => 0,
+        GemType.skull => 0,
+        GemType.bones => 0,
         GemType.silver => 5,
         GemType.gold => 10,
         GemType.emerald => 15,
@@ -17,8 +19,11 @@ extension GemTypeX on GemType {
         GemType.diamond => 50,
       };
 
+  bool get isWorthless => value <= 0;
+
   String get label => switch (this) {
-        GemType.coal => 'Coal',
+        GemType.skull => 'Skull',
+        GemType.bones => 'Bones',
         GemType.silver => 'Silver',
         GemType.gold => 'Gold',
         GemType.emerald => 'Emerald',
@@ -26,12 +31,5 @@ extension GemTypeX on GemType {
         GemType.diamond => 'Diamond',
       };
 
-  String get emoji => switch (this) {
-        GemType.coal => '●',
-        GemType.silver => '◇',
-        GemType.gold => '◆',
-        GemType.emerald => '◈',
-        GemType.ruby => '♦',
-        GemType.diamond => '✦',
-      };
+  String get assetName => name;
 }

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../models/cell.dart';
@@ -6,7 +8,7 @@ import '../../systems/board_logic.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/game_assets.dart';
 
-class BoardWidget extends StatelessWidget {
+class BoardWidget extends StatefulWidget {
   const BoardWidget({
     super.key,
     required this.board,
@@ -15,6 +17,10 @@ class BoardWidget extends StatelessWidget {
     this.previewRow,
     this.previewCol,
     this.previewValid = false,
+    this.highlightRows = const {},
+    this.highlightCols = const {},
+    this.explodingCells = const {},
+    this.explosionEventId = 0,
     this.dynamiteHoverRow,
     this.dynamiteHoverCol,
   });
@@ -25,65 +31,128 @@ class BoardWidget extends StatelessWidget {
   final int? previewRow;
   final int? previewCol;
   final bool previewValid;
+  final Set<int> highlightRows;
+  final Set<int> highlightCols;
+  final Set<(int, int)> explodingCells;
+  final int explosionEventId;
   final int? dynamiteHoverRow;
   final int? dynamiteHoverCol;
 
   @override
+  State<BoardWidget> createState() => _BoardWidgetState();
+}
+
+class _BoardWidgetState extends State<BoardWidget>
+    with TickerProviderStateMixin {
+  late final AnimationController _pulse;
+  late final AnimationController _shatter;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    )..repeat(reverse: true);
+    _shatter = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 520),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant BoardWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.explosionEventId != oldWidget.explosionEventId &&
+        widget.explosionEventId > 0) {
+      _shatter
+        ..reset()
+        ..forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    _shatter.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final side = cellSize * BoardLogic.size;
-    return Container(
-      width: side,
-      height: side,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFF0E0C8), BoomColors.boardBg],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: BoomColors.ink.withValues(alpha: 0.18),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Stack(
-          children: [
-            CustomPaint(
-              size: Size(side, side),
-              painter: _BoardPainter(
-                board: board,
-                cellSize: cellSize,
-                previewShape: previewShape,
-                previewRow: previewRow,
-                previewCol: previewCol,
-                previewValid: previewValid,
-                dynamiteHoverRow: dynamiteHoverRow,
-                dynamiteHoverCol: dynamiteHoverCol,
-              ),
+    final side = widget.cellSize * BoardLogic.size;
+    return AnimatedBuilder(
+      animation: Listenable.merge([_pulse, _shatter]),
+      builder: (context, _) {
+        return Container(
+          width: side,
+          height: side,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF1A140F), Color(0xFF0B0907)],
             ),
-            for (var r = 0; r < BoardLogic.size; r++)
-              for (var c = 0; c < BoardLogic.size; c++)
-                if (board[r][c].hasGem)
-                  Positioned(
-                    left: c * cellSize + cellSize * 0.12,
-                    top: r * cellSize + cellSize * 0.12,
-                    width: cellSize * 0.76,
-                    height: cellSize * 0.76,
-                    child: Image.asset(
-                      GameAssets.gem(board[r][c].gem!.name),
-                      fit: BoxFit.contain,
-                      filterQuality: FilterQuality.medium,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                    ),
+            border: Border.all(color: BoomColors.frameGold, width: 2.2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.55),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              children: [
+                CustomPaint(
+                  size: Size(side, side),
+                  painter: _BoardPainter(
+                    board: widget.board,
+                    cellSize: widget.cellSize,
+                    previewShape: widget.previewShape,
+                    previewRow: widget.previewRow,
+                    previewCol: widget.previewCol,
+                    previewValid: widget.previewValid,
+                    highlightRows: widget.highlightRows,
+                    highlightCols: widget.highlightCols,
+                    pulse: _pulse.value,
+                    explodingCells: widget.explodingCells,
+                    shatter: Curves.easeOut.transform(_shatter.value),
+                    dynamiteHoverRow: widget.dynamiteHoverRow,
+                    dynamiteHoverCol: widget.dynamiteHoverCol,
                   ),
-          ],
-        ),
-      ),
+                ),
+                for (var r = 0; r < BoardLogic.size; r++)
+                  for (var c = 0; c < BoardLogic.size; c++)
+                    if (widget.board[r][c].hasGem &&
+                        !(widget.explodingCells.contains((r, c)) &&
+                            _shatter.value > 0.2))
+                      Positioned(
+                        left: c * widget.cellSize + widget.cellSize * 0.12,
+                        top: r * widget.cellSize + widget.cellSize * 0.12,
+                        width: widget.cellSize * 0.76,
+                        height: widget.cellSize * 0.76,
+                        child: Opacity(
+                          opacity: widget.explodingCells.contains((r, c))
+                              ? (1 - _shatter.value).clamp(0.0, 1.0)
+                              : 1,
+                          child: Image.asset(
+                            GameAssets.gem(widget.board[r][c].gem!.name),
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.medium,
+                            errorBuilder: (_, __, ___) =>
+                                const SizedBox.shrink(),
+                          ),
+                        ),
+                      ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -96,6 +165,11 @@ class _BoardPainter extends CustomPainter {
     this.previewRow,
     this.previewCol,
     this.previewValid = false,
+    required this.highlightRows,
+    required this.highlightCols,
+    required this.pulse,
+    required this.explodingCells,
+    required this.shatter,
     this.dynamiteHoverRow,
     this.dynamiteHoverCol,
   });
@@ -106,32 +180,42 @@ class _BoardPainter extends CustomPainter {
   final int? previewRow;
   final int? previewCol;
   final bool previewValid;
+  final Set<int> highlightRows;
+  final Set<int> highlightCols;
+  final double pulse;
+  final Set<(int, int)> explodingCells;
+  final double shatter;
   final int? dynamiteHoverRow;
   final int? dynamiteHoverCol;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final gridPaint = Paint()
-      ..color = BoomColors.boardLine
-      ..strokeWidth = 1;
-
-    for (var i = 0; i <= BoardLogic.size; i++) {
-      final o = i * cellSize;
-      canvas.drawLine(Offset(o, 0), Offset(o, size.height), gridPaint);
-      canvas.drawLine(Offset(0, o), Offset(size.width, o), gridPaint);
-    }
-
     for (var r = 0; r < BoardLogic.size; r++) {
       for (var c = 0; c < BoardLogic.size; c++) {
+        final rect = Rect.fromLTWH(
+          c * cellSize + 2,
+          r * cellSize + 2,
+          cellSize - 4,
+          cellSize - 4,
+        );
+        final highlighted =
+            highlightRows.contains(r) || highlightCols.contains(c);
+        _drawEmpty(canvas, rect, highlighted: highlighted);
+
         if (!board[r][c].filled) continue;
-        _drawEarth(canvas, c * cellSize, r * cellSize);
+        final exploding = explodingCells.contains((r, c));
+        if (exploding && shatter > 0) {
+          _drawShatter(canvas, rect, shatter);
+        } else if (!exploding || shatter == 0) {
+          _drawEarth(canvas, rect);
+        }
       }
     }
 
     if (previewShape != null && previewRow != null && previewCol != null) {
       final color = previewValid
-          ? BoomColors.success.withValues(alpha: 0.45)
-          : BoomColors.danger.withValues(alpha: 0.45);
+          ? BoomColors.gold.withValues(alpha: 0.42)
+          : BoomColors.danger.withValues(alpha: 0.42);
       final paint = Paint()..color = color;
       for (final p in previewShape!.cells) {
         final x = (previewCol! + p.x) * cellSize;
@@ -143,12 +227,22 @@ class _BoardPainter extends CustomPainter {
           ),
           paint,
         );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(x + 2, y + 2, cellSize - 4, cellSize - 4),
+            const Radius.circular(6),
+          ),
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.8
+            ..color = previewValid ? BoomColors.gold : BoomColors.danger,
+        );
       }
     }
 
     if (dynamiteHoverRow != null && dynamiteHoverCol != null) {
       final paint = Paint()
-        ..color = BoomColors.dynamite.withValues(alpha: 0.35);
+        ..color = BoomColors.dynamite.withValues(alpha: 0.38);
       final r = dynamiteHoverRow!;
       final c = dynamiteHoverCol!;
       for (var rr = r - 1; rr <= r + 1; rr++) {
@@ -176,22 +270,110 @@ class _BoardPainter extends CustomPainter {
     }
   }
 
-  void _drawEarth(Canvas canvas, double x, double y) {
-    final rect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(x + 2, y + 2, cellSize - 4, cellSize - 4),
-      const Radius.circular(7),
+  void _drawEmpty(Canvas canvas, Rect rect, {required bool highlighted}) {
+    final paint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: highlighted
+            ? [
+                Color.lerp(
+                  const Color(0xFF3A1814),
+                  const Color(0xFF7A2A22),
+                  0.35 + pulse * 0.45,
+                )!,
+                Color.lerp(
+                  const Color(0xFF2A100E),
+                  const Color(0xFF5A1C18),
+                  0.35 + pulse * 0.45,
+                )!,
+              ]
+            : const [Color(0xFF2A221C), Color(0xFF17120E)],
+      ).createShader(rect);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(7)),
+      paint,
     );
+    if (highlighted) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, const Radius.circular(7)),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.6
+          ..color = Color.lerp(
+            const Color(0x66FF6B5A),
+            const Color(0xCCFF3B2F),
+            pulse,
+          )!,
+      );
+    }
+  }
+
+  void _drawEarth(Canvas canvas, Rect rect) {
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(7));
     final paint = Paint()
       ..shader = const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [Color(0xFFD2B48C), BoomColors.earth, Color(0xFFA67C52)],
-      ).createShader(rect.outerRect);
-    canvas.drawRRect(rect, paint);
+        colors: [Color(0xFF6B4A32), Color(0xFF3A2618)],
+      ).createShader(rect);
+    canvas.drawRRect(rrect, paint);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect.deflate(1.2), const Radius.circular(6)),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2
+        ..color = const Color(0x66E8C07A),
+    );
+    final speck = Paint()..color = BoomColors.rock.withValues(alpha: 0.45);
+    canvas.drawCircle(
+      Offset(rect.left + rect.width * 0.3, rect.top + rect.height * 0.35),
+      2,
+      speck,
+    );
+    canvas.drawCircle(
+      Offset(rect.left + rect.width * 0.65, rect.top + rect.height * 0.6),
+      1.5,
+      speck,
+    );
+  }
 
-    final speck = Paint()..color = BoomColors.rock.withValues(alpha: 0.35);
-    canvas.drawCircle(Offset(x + cellSize * 0.3, y + cellSize * 0.35), 2, speck);
-    canvas.drawCircle(Offset(x + cellSize * 0.65, y + cellSize * 0.6), 1.5, speck);
+  void _drawShatter(Canvas canvas, Rect rect, double t) {
+    final rnd = math.Random((rect.left * 17 + rect.top * 31).toInt());
+    final center = rect.center;
+    for (var i = 0; i < 7; i++) {
+      final angle = (i / 7) * math.pi * 2 + rnd.nextDouble();
+      final dist = rect.width * (0.35 + rnd.nextDouble() * 0.55) * t;
+      final chunk = Rect.fromCenter(
+        center: center + Offset(math.cos(angle) * dist, math.sin(angle) * dist),
+        width: rect.width * (0.22 - t * 0.08),
+        height: rect.height * (0.18 - t * 0.06),
+      );
+      canvas.save();
+      canvas.translate(chunk.center.dx, chunk.center.dy);
+      canvas.rotate(angle * t);
+      canvas.translate(-chunk.center.dx, -chunk.center.dy);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(chunk, const Radius.circular(3)),
+        Paint()
+          ..color = Color.lerp(
+            const Color(0xFF6B4A32),
+            const Color(0x00C4A574),
+            t,
+          )!,
+      );
+      canvas.restore();
+    }
+    canvas.drawCircle(
+      center,
+      rect.width * (0.2 + t * 0.55),
+      Paint()
+        ..color = Color.lerp(
+          const Color(0x66C4A574),
+          const Color(0x00C4A574),
+          t,
+        )!,
+    );
   }
 
   @override
@@ -261,7 +443,7 @@ class _PiecePainter extends CustomPainter {
         ..shader = LinearGradient(
           colors: color != null
               ? [color!, color!.withValues(alpha: 0.8)]
-              : const [Color(0xFFD2B48C), Color(0xFFA67C52)],
+              : const [Color(0xFF7A5538), Color(0xFF3A2618)],
         ).createShader(rect.outerRect);
       canvas.drawRRect(rect, fill);
       if (hasRope) {
@@ -275,7 +457,7 @@ class _PiecePainter extends CustomPainter {
         canvas.drawRRect(
           rect.deflate(3),
           Paint()
-            ..color = const Color(0xFF8B6914)
+            ..color = const Color(0xFFE8C07A)
             ..style = PaintingStyle.stroke
             ..strokeWidth = 1.2,
         );

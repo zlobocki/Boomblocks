@@ -39,6 +39,7 @@ class ScoreboardScreen extends StatelessWidget {
                   style: GoogleFonts.nunito(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
+                    color: BoomColors.cream,
                   ),
                 ),
               );
@@ -51,17 +52,20 @@ class ScoreboardScreen extends StatelessWidget {
                 final e = scores[i];
                 final date = DateTime.tryParse(e.dateIso);
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
                     color: BoomColors.hud.withValues(alpha: 0.95),
                     borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: BoomColors.frameGold.withValues(alpha: 0.4),
+                    ),
                   ),
                   child: Row(
                     children: [
                       CircleAvatar(
-                        backgroundColor: i == 0
-                            ? BoomColors.rope
-                            : BoomColors.earth,
+                        backgroundColor:
+                            i == 0 ? BoomColors.rope : BoomColors.earth,
                         child: Text(
                           '${i + 1}',
                           style: GoogleFonts.nunito(
@@ -80,6 +84,7 @@ class ScoreboardScreen extends StatelessWidget {
                               style: GoogleFonts.nunito(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
+                                color: BoomColors.cream,
                               ),
                             ),
                             if (date != null)
@@ -87,7 +92,7 @@ class ScoreboardScreen extends StatelessWidget {
                                 '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
                                 style: GoogleFonts.nunito(
                                   fontSize: 12,
-                                  color: BoomColors.ink.withValues(alpha: 0.55),
+                                  color: BoomColors.dust.withValues(alpha: 0.75),
                                 ),
                               ),
                           ],
@@ -98,7 +103,7 @@ class ScoreboardScreen extends StatelessWidget {
                         style: GoogleFonts.nunito(
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
-                          color: BoomColors.accentDeep,
+                          color: BoomColors.gold,
                         ),
                       ),
                     ],
