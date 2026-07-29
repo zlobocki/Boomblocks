@@ -128,7 +128,13 @@ class GameController extends ChangeNotifier {
   }
 
   void clearExplosion() {
+    if (explodingCells.isEmpty) return;
+    // Keep markers through the disaster blow-up so blocks don't reappear.
+    if (status == GameStatus.disaster || status == GameStatus.exploding) {
+      return;
+    }
     explodingCells = [];
+    notifyListeners();
   }
 
   PlacementSnapshot _captureSnapshot() {

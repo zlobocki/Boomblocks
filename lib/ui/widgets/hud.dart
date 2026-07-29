@@ -40,10 +40,14 @@ class GameHud extends StatelessWidget {
               children: [
                 Text(
                   'BoomBlocks',
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.visible,
                   style: GoogleFonts.fredoka(
-                    fontSize: 24,
+                    fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: BoomColors.gold,
+                    height: 1.1,
                   ),
                 ),
                 AnimatedOpacity(
@@ -51,8 +55,10 @@ class GameHud extends StatelessWidget {
                   duration: const Duration(milliseconds: 200),
                   child: Text(
                     scoreToast ?? ' ',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.nunito(
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.w800,
                       color: BoomColors.success,
                     ),

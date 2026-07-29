@@ -51,7 +51,8 @@ class ItemSlot extends StatelessWidget {
               onPanUpdate: !canDrag || onDragUpdate == null
                   ? null
                   : (d) => onDragUpdate!(d.globalPosition),
-              onPanEnd: !canDrag || onDragEnd == null ? null : (_) => onDragEnd!(),
+              onPanEnd:
+                  !canDrag || onDragEnd == null ? null : (_) => onDragEnd!(),
               onPanCancel: !canDrag || onDragEnd == null ? null : onDragEnd,
               child: Opacity(
                 opacity: dragging ? 0.35 : (canUse ? 1 : 0.45),
@@ -66,14 +67,14 @@ class ItemSlot extends StatelessWidget {
             if (showMax)
               const Positioned(
                 top: -10,
-                right: -8,
+                right: -4,
                 child: _MaxBadge(),
               ),
           ],
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         SizedBox(
-          width: 72,
+          width: 78,
           child: Column(
             children: [
               Text(
@@ -127,8 +128,8 @@ class _IconBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 60,
-      height: 60,
+      width: 76,
+      height: 76,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -140,19 +141,19 @@ class _IconBadge extends StatelessWidget {
             ),
           ),
           Positioned(
-            right: -4,
+            right: -2,
             top: -2,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
                 color: accent,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: BoomColors.ink, width: 1.5),
+                border: Border.all(color: const Color(0xFF0B0907), width: 1.5),
               ),
               child: Text(
                 '$count/$maxCount',
                 style: GoogleFonts.nunito(
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w800,
                   color: Colors.white,
                 ),

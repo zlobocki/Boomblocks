@@ -459,6 +459,7 @@ class _GameScreenState extends State<GameScreen> {
                           highlightCols: _highlightCols,
                           explodingCells: _explodingCellSet,
                           explosionEventId: c.explosionEventId,
+                          onShatterComplete: c.clearExplosion,
                           dynamiteHoverRow:
                               _draggingDynamite ? _dynamiteRow : null,
                           dynamiteHoverCol:

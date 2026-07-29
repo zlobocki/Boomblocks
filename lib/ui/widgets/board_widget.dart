@@ -21,6 +21,7 @@ class BoardWidget extends StatefulWidget {
     this.highlightCols = const {},
     this.explodingCells = const {},
     this.explosionEventId = 0,
+    this.onShatterComplete,
     this.dynamiteHoverRow,
     this.dynamiteHoverCol,
   });
@@ -35,6 +36,7 @@ class BoardWidget extends StatefulWidget {
   final Set<int> highlightCols;
   final Set<(int, int)> explodingCells;
   final int explosionEventId;
+  final VoidCallback? onShatterComplete;
   final int? dynamiteHoverRow;
   final int? dynamiteHoverCol;
 
@@ -57,7 +59,13 @@ class _BoardWidgetState extends State<BoardWidget>
     _shatter = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 520),
-    );
+    )..addStatusListener(_onShatterStatus);
+  }
+
+  void _onShatterStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed) {
+      widget.onShatterComplete?.call();
+    }
   }
 
   @override
@@ -73,10 +81,15 @@ class _BoardWidgetState extends State<BoardWidget>
 
   @override
   void dispose() {
+    _shatter.removeStatusListener(_onShatterStatus);
     _pulse.dispose();
     _shatter.dispose();
     super.dispose();
   }
+
+  bool get _shatterActive =>
+      _shatter.isAnimating ||
+      (_shatter.value > 0 && _shatter.value < 1);
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +97,8 @@ class _BoardWidgetState extends State<BoardWidget>
     return AnimatedBuilder(
       animation: Listenable.merge([_pulse, _shatter]),
       builder: (context, _) {
+        final shatterT = Curves.easeOut.transform(_shatter.value);
+        final shatterActive = _shatterActive;
         return Container(
           width: side,
           height: side,
@@ -120,7 +135,8 @@ class _BoardWidgetState extends State<BoardWidget>
                     highlightCols: widget.highlightCols,
                     pulse: _pulse.value,
                     explodingCells: widget.explodingCells,
-                    shatter: Curves.easeOut.transform(_shatter.value),
+                    shatter: shatterT,
+                    shatterActive: shatterActive,
                     dynamiteHoverRow: widget.dynamiteHoverRow,
                     dynamiteHoverCol: widget.dynamiteHoverCol,
                   ),
@@ -128,16 +144,18 @@ class _BoardWidgetState extends State<BoardWidget>
                 for (var r = 0; r < BoardLogic.size; r++)
                   for (var c = 0; c < BoardLogic.size; c++)
                     if (widget.board[r][c].hasGem &&
-                        !(widget.explodingCells.contains((r, c)) &&
-                            _shatter.value > 0.2))
+                        !(shatterActive &&
+                            widget.explodingCells.contains((r, c)) &&
+                            shatterT > 0.2))
                       Positioned(
                         left: c * widget.cellSize + widget.cellSize * 0.12,
                         top: r * widget.cellSize + widget.cellSize * 0.12,
                         width: widget.cellSize * 0.76,
                         height: widget.cellSize * 0.76,
                         child: Opacity(
-                          opacity: widget.explodingCells.contains((r, c))
-                              ? (1 - _shatter.value).clamp(0.0, 1.0)
+                          opacity: shatterActive &&
+                                  widget.explodingCells.contains((r, c))
+                              ? (1 - shatterT).clamp(0.0, 1.0)
                               : 1,
                           child: Image.asset(
                             GameAssets.gem(widget.board[r][c].gem!.name),
@@ -170,6 +188,7 @@ class _BoardPainter extends CustomPainter {
     required this.pulse,
     required this.explodingCells,
     required this.shatter,
+    required this.shatterActive,
     this.dynamiteHoverRow,
     this.dynamiteHoverCol,
   });
@@ -185,6 +204,7 @@ class _BoardPainter extends CustomPainter {
   final double pulse;
   final Set<(int, int)> explodingCells;
   final double shatter;
+  final bool shatterActive;
   final int? dynamiteHoverRow;
   final int? dynamiteHoverCol;
 
@@ -202,11 +222,16 @@ class _BoardPainter extends CustomPainter {
             highlightRows.contains(r) || highlightCols.contains(c);
         _drawEmpty(canvas, rect, highlighted: highlighted);
 
-        if (!board[r][c].filled) continue;
-        final exploding = explodingCells.contains((r, c));
-        if (exploding && shatter > 0) {
+        final marked = explodingCells.contains((r, c));
+        final filled = board[r][c].filled;
+
+        if (marked && shatterActive) {
+          // Cleared cells are already empty in model; still draw shatter.
           _drawShatter(canvas, rect, shatter);
-        } else if (!exploding || shatter == 0) {
+        } else if (marked && shatter >= 1) {
+          // Hold final dust frame (e.g. disaster) so filled cells stay hidden.
+          _drawShatter(canvas, rect, 1);
+        } else if (filled) {
           _drawEarth(canvas, rect);
         }
       }
