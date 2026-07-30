@@ -12,6 +12,7 @@ import '../systems/gem_spawner.dart';
 import '../systems/piece_generator.dart';
 import '../systems/puzzle_solver.dart';
 import '../systems/sound_service.dart';
+import '../theme/tile_texture.dart';
 
 enum GameStatus { playing, disaster, exploding, gameOver }
 
@@ -55,6 +56,16 @@ class GameController extends ChangeNotifier {
   /// True when the player is stuck (no fits, no dynamite) but still holds a
   /// usable undo: the UI must ask "undo last move or end game?".
   bool stuckChoicePending = false;
+
+  final Random _rng = Random();
+
+  /// Block tile in use (1-based); rotated on every loot reset.
+  int tileIndex = 1;
+
+  /// Recently used tiles, newest last — a new tile must not repeat any of
+  /// these. Capped at [tileHistoryWindow].
+  List<int> tileHistory = [];
+  static const tileHistoryWindow = 10;
 
   int gemsCollectedTowardReset = 0;
   static const lootResetAt = GemSpawner.lootResetAt;
@@ -106,6 +117,7 @@ class GameController extends ChangeNotifier {
     explodingCells = [];
     _undoSnapshot = null;
     stuckChoicePending = false;
+    tileHistory = [];
     _seedBoard();
     _dealTray();
     loaded = true;
@@ -117,6 +129,28 @@ class GameController extends ChangeNotifier {
     BoardLogic.prefillBoard(board, targetCells: 26 + difficultyLevel * 2);
     _gems.spawnWave(board, round);
     gemsCollectedTowardReset = 0;
+    _rotateTile();
+  }
+
+  /// Picks a random tile that hasn't been used in the last
+  /// [tileHistoryWindow] loot resets. All blocks share the single tile.
+  void _rotateTile() {
+    final candidates = [
+      for (var t = 1; t <= TileTexture.count; t++)
+        if (!tileHistory.contains(t)) t,
+    ];
+    final pool = candidates.isNotEmpty
+        ? candidates
+        : [
+            for (var t = 1; t <= TileTexture.count; t++)
+              if (t != tileIndex) t,
+          ];
+    tileIndex = pool[_rng.nextInt(pool.length)];
+    tileHistory.add(tileIndex);
+    while (tileHistory.length > tileHistoryWindow) {
+      tileHistory.removeAt(0);
+    }
+    TileTexture.currentIndex = tileIndex;
   }
 
   void _dealTray() {
@@ -196,6 +230,10 @@ class GameController extends ChangeNotifier {
     _seedBoard();
     _dealTray();
   }
+
+  /// Test hook: force a tile rotation (normally driven by loot resets).
+  @visibleForTesting
+  void debugRotateTile() => _rotateTile();
 
   void clearToasts() {
     maxToast = null;
@@ -379,6 +417,7 @@ class GameController extends ChangeNotifier {
   void _refreshLootWave() {
     _gems.clearAllGems(board);
     _gems.spawnWave(board, round);
+    _rotateTile();
     lastScoreToast = 'New loot!';
   }
 
@@ -531,6 +570,8 @@ class GameController extends ChangeNotifier {
         'difficultyLevel': difficultyLevel,
         'piecesPlacedThisRound': piecesPlacedThisRound,
         'gemsCollectedTowardReset': gemsCollectedTowardReset,
+        'tileIndex': tileIndex,
+        'tileHistory': tileHistory,
         'status': GameStatus.playing.name,
       };
 
@@ -554,6 +595,12 @@ class GameController extends ChangeNotifier {
     difficultyLevel = json['difficultyLevel'] as int? ?? 1;
     piecesPlacedThisRound = json['piecesPlacedThisRound'] as int? ?? 0;
     gemsCollectedTowardReset = json['gemsCollectedTowardReset'] as int? ?? 0;
+    tileIndex = (json['tileIndex'] as int? ?? 1).clamp(1, TileTexture.count);
+    tileHistory = [
+      for (final t in (json['tileHistory'] as List? ?? const []))
+        (t as num).toInt(),
+    ];
+    TileTexture.currentIndex = tileIndex;
     status = GameStatus.playing;
     _undoSnapshot = null;
   }

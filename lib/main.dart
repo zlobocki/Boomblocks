@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -11,7 +13,9 @@ Future<void> main() async {
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  await TileTexture.load();
+  // Don't block first paint on 21 tile decodes; painters fall back until
+  // textures are ready.
+  unawaited(TileTexture.load());
   runApp(const BoomBlocksApp());
 }
 

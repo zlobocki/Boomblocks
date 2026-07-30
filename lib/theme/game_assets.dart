@@ -6,7 +6,6 @@ class GameAssets {
   static const skull2 = 'assets/images/skull2.png';
   static const bones = 'assets/images/bones.png';
   static const bones2 = 'assets/images/bones2.png';
-  static const tile1 = 'assets/images/tile1.png';
   static const silver = 'assets/images/silver.png';
   static const gold = 'assets/images/gold.png';
   static const emerald = 'assets/images/emerald.png';
