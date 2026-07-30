@@ -110,6 +110,34 @@ void main() {
       }
     });
 
+    test('rectangles and diagonals have expected footprints', () {
+      expect(PieceCatalog.rect3x2.cells.length, 6);
+      expect(PieceCatalog.rect3x2.width, 3);
+      expect(PieceCatalog.rect3x2.height, 2);
+      expect(PieceCatalog.rect2x3.cells.length, 6);
+      expect(PieceCatalog.rect2x3.width, 2);
+      expect(PieceCatalog.rect2x3.height, 3);
+      expect(PieceCatalog.diag2.cells.length, 2);
+      expect(PieceCatalog.diag2.width, 2);
+      expect(PieceCatalog.diag2.height, 2);
+      expect(PieceCatalog.diag3.cells.length, 3);
+      expect(PieceCatalog.diag3.width, 3);
+      expect(PieceCatalog.diag3.height, 3);
+    });
+
+    test('diagonal pieces place without filling the whole bounding box', () {
+      final board = BoardLogic.emptyBoard();
+      board[0][1].placeEarth();
+      board[1][0].placeEarth();
+      // Anti-diagonal cells are occupied, but diag2 only needs (0,0),(1,1).
+      expect(BoardLogic.canPlace(board, PieceCatalog.diag2, 0, 0), isTrue);
+      // Rotating diag2 yields the anti-diagonal, which is blocked.
+      expect(
+        BoardLogic.canPlace(board, PieceCatalog.diag2.rotated90(), 0, 0),
+        isFalse,
+      );
+    });
+
     test('prefill populates board without completing lines', () {
       final board = BoardLogic.emptyBoard();
       BoardLogic.prefillBoard(board, targetCells: 20, random: Random(1));

@@ -57,6 +57,20 @@ class MusicService {
       }
       if (_long.isEmpty && _short.isEmpty) return;
 
+      // Music holds normal media focus; SFX are configured not to take it.
+      await _player.setAudioContext(
+        AudioContext(
+          android: const AudioContextAndroid(
+            audioFocus: AndroidAudioFocus.gain,
+            usageType: AndroidUsageType.media,
+            contentType: AndroidContentType.music,
+          ),
+          iOS: AudioContextIOS(
+            category: AVAudioSessionCategory.playback,
+            options: const {AVAudioSessionOptions.mixWithOthers},
+          ),
+        ),
+      );
       await _player.setReleaseMode(ReleaseMode.stop);
       await _player.setVolume(_volume);
       _player.onPlayerComplete.listen((_) => _playNext());

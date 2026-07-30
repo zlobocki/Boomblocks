@@ -182,6 +182,31 @@ class PieceCatalog {
 
   static List<PieceShape> get bigLAll => [bigL0, bigL1, bigL2, bigL3];
 
+  /// 3-wide × 2-tall rectangle (6 cells).
+  static final rect3x2 = PieceShape('rect3x2', [
+    for (var y = 0; y < 2; y++)
+      for (var x = 0; x < 3; x++) Point<int>(x, y),
+  ]);
+
+  /// 2-wide × 3-tall rectangle (6 cells).
+  static final rect2x3 = PieceShape('rect2x3', [
+    for (var y = 0; y < 3; y++)
+      for (var x = 0; x < 2; x++) Point<int>(x, y),
+  ]);
+
+  /// Two blocks on a diagonal.
+  static final diag2 = PieceShape('diag2', [
+    const Point(0, 0),
+    const Point(1, 1),
+  ]);
+
+  /// Three blocks on a diagonal.
+  static final diag3 = PieceShape('diag3', [
+    const Point(0, 0),
+    const Point(1, 1),
+    const Point(2, 2),
+  ]);
+
   static List<PieceShape> get easy => [
         monomino,
         dominoH,
@@ -192,6 +217,7 @@ class PieceCatalog {
         tetrominoT,
         bigL0,
         bigL1,
+        diag2,
       ];
 
   static List<PieceShape> get medium => [
@@ -203,6 +229,10 @@ class PieceCatalog {
         tetrominoL,
         tetrominoJ,
         square3,
+        rect3x2,
+        rect2x3,
+        diag2,
+        diag3,
         ...bigLAll,
       ];
 
@@ -215,6 +245,10 @@ class PieceCatalog {
         tetrominoZ,
         square3,
         square3,
+        rect3x2,
+        rect2x3,
+        diag3,
+        diag3,
         ...bigLAll,
         ...bigLAll,
       ];

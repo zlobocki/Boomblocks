@@ -18,6 +18,21 @@ class SoundService {
   Future<void> init() async {
     if (_ready) return;
     try {
+      // SFX must never request audio focus, or Android pauses the music
+      // player every time an effect fires.
+      await _player.setAudioContext(
+        AudioContext(
+          android: const AudioContextAndroid(
+            audioFocus: AndroidAudioFocus.none,
+            usageType: AndroidUsageType.game,
+            contentType: AndroidContentType.sonification,
+          ),
+          iOS: AudioContextIOS(
+            category: AVAudioSessionCategory.ambient,
+            options: const {AVAudioSessionOptions.mixWithOthers},
+          ),
+        ),
+      );
       // Short SFX: low-latency mode (SoundPool on Android) cuts the audible
       // delay between an action and its sound.
       await _player.setPlayerMode(PlayerMode.lowLatency);
