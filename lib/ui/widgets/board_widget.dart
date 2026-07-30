@@ -7,6 +7,7 @@ import '../../models/piece.dart';
 import '../../systems/board_logic.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/game_assets.dart';
+import '../../theme/tile_texture.dart';
 
 class BoardWidget extends StatefulWidget {
   const BoardWidget({
@@ -171,7 +172,7 @@ class _BoardWidgetState extends State<BoardWidget>
                                 ? (1 - shatterT).clamp(0.0, 1.0)
                                 : 1,
                             child: Image.asset(
-                              GameAssets.gem(widget.board[r][c].gem!.name),
+                              GameAssets.gemAt(widget.board[r][c].gem!, r, c),
                               fit: BoxFit.contain,
                               filterQuality: FilterQuality.medium,
                               errorBuilder: (_, __, ___) =>
@@ -350,6 +351,19 @@ class _BoardPainter extends CustomPainter {
 
   void _drawEarth(Canvas canvas, Rect rect) {
     final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(7));
+    final tile = TileTexture.image;
+    if (tile != null) {
+      canvas.save();
+      canvas.clipRRect(rrect);
+      canvas.drawImageRect(
+        tile,
+        Rect.fromLTWH(0, 0, tile.width.toDouble(), tile.height.toDouble()),
+        rect,
+        Paint()..filterQuality = FilterQuality.medium,
+      );
+      canvas.restore();
+      return;
+    }
     final paint = Paint()
       ..shader = const LinearGradient(
         begin: Alignment.topLeft,
@@ -468,6 +482,7 @@ class _PiecePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final tile = color == null ? TileTexture.image : null;
     for (final p in shape.cells) {
       final rect = RRect.fromRectAndRadius(
         Rect.fromLTWH(
@@ -478,13 +493,25 @@ class _PiecePainter extends CustomPainter {
         ),
         const Radius.circular(6),
       );
-      final fill = Paint()
-        ..shader = LinearGradient(
-          colors: color != null
-              ? [color!, color!.withValues(alpha: 0.8)]
-              : const [Color(0xFF7A5538), Color(0xFF3A2618)],
-        ).createShader(rect.outerRect);
-      canvas.drawRRect(rect, fill);
+      if (tile != null) {
+        canvas.save();
+        canvas.clipRRect(rect);
+        canvas.drawImageRect(
+          tile,
+          Rect.fromLTWH(0, 0, tile.width.toDouble(), tile.height.toDouble()),
+          rect.outerRect,
+          Paint()..filterQuality = FilterQuality.medium,
+        );
+        canvas.restore();
+      } else {
+        final fill = Paint()
+          ..shader = LinearGradient(
+            colors: color != null
+                ? [color!, color!.withValues(alpha: 0.8)]
+                : const [Color(0xFF7A5538), Color(0xFF3A2618)],
+          ).createShader(rect.outerRect);
+        canvas.drawRRect(rect, fill);
+      }
       if (hasRope) {
         canvas.drawRRect(
           rect,

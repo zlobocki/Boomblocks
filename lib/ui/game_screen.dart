@@ -43,6 +43,7 @@ class _GameScreenState extends State<GameScreen> {
   bool _showDynMax = false;
   bool _showUndoMax = false;
   bool _gameOverShown = false;
+  bool _stuckPromptShown = false;
 
   int? _dragTrayIndex;
   Offset? _pointerGlobal;
@@ -108,6 +109,62 @@ class _GameScreenState extends State<GameScreen> {
     if (c.status == GameStatus.gameOver && !_gameOverShown) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _showGameOver());
     }
+    if (c.stuckChoicePending && !_stuckPromptShown) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showStuckChoice());
+    }
+  }
+
+  Future<void> _showStuckChoice() async {
+    if (!mounted || _stuckPromptShown || !c.stuckChoicePending) return;
+    _stuckPromptShown = true;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: BoomColors.hud,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'No viable moves left.',
+          style: GoogleFonts.fredoka(
+            fontWeight: FontWeight.w600,
+            color: BoomColors.danger,
+          ),
+        ),
+        content: Text(
+          'You can undo your last move (uses 1 undo) or end the game.',
+          style: GoogleFonts.nunito(color: BoomColors.cream),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              c.resolveStuckWithUndo();
+            },
+            child: Text(
+              'Undo last move',
+              style: GoogleFonts.nunito(
+                fontWeight: FontWeight.w800,
+                color: BoomColors.gold,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              c.resolveStuckEndGame();
+            },
+            child: Text(
+              'End game',
+              style: GoogleFonts.nunito(
+                fontWeight: FontWeight.w800,
+                color: BoomColors.danger,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    _stuckPromptShown = false;
   }
 
   RenderBox? _boardBox() =>

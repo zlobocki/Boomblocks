@@ -52,6 +52,10 @@ class GameController extends ChangeNotifier {
   String? lastScoreToast;
   bool loaded = false;
 
+  /// True when the player is stuck (no fits, no dynamite) but still holds a
+  /// usable undo: the UI must ask "undo last move or end game?".
+  bool stuckChoicePending = false;
+
   int gemsCollectedTowardReset = 0;
   static const lootResetAt = GemSpawner.lootResetAt;
 
@@ -77,6 +81,9 @@ class GameController extends ChangeNotifier {
       if (saved != null) {
         _fromJson(saved);
         loaded = true;
+        // A restored game may already be stuck (undo snapshots don't
+        // survive restarts) — re-evaluate instead of soft-locking.
+        _checkGameOver();
         notifyListeners();
         return;
       }
@@ -98,6 +105,7 @@ class GameController extends ChangeNotifier {
     pendingGemFlights = [];
     explodingCells = [];
     _undoSnapshot = null;
+    stuckChoicePending = false;
     _seedBoard();
     _dealTray();
     loaded = true;
@@ -252,6 +260,7 @@ class GameController extends ChangeNotifier {
       ),
     );
     _undoSnapshot = null;
+    stuckChoicePending = false;
     lastScoreToast = 'Undone';
     pendingGemFlights = [];
     explodingCells = [];
@@ -423,10 +432,30 @@ class GameController extends ChangeNotifier {
     if (anyPlaceable) return;
 
     // Nothing fits, even considering rope rotations when rope is available
-    // or a piece already has rope. Stay alive only if dynamite can still be
-    // used, or undo can actually be used (has a last placement to restore).
-    if (inventory.dynamite.count > 0 || canUndoPlacement) return;
+    // or a piece already has rope.
+    if (inventory.dynamite.count > 0) return; // player can still blast open
 
+    if (canUndoPlacement) {
+      // Undo is the only way out — force the choice instead of soft-locking.
+      stuckChoicePending = true;
+      notifyListeners();
+      return;
+    }
+
+    _startDisasterSequence();
+  }
+
+  /// Player chose "Undo last move" in the stuck prompt.
+  void resolveStuckWithUndo() {
+    if (!stuckChoicePending) return;
+    stuckChoicePending = false;
+    undoLastPlacement();
+  }
+
+  /// Player chose "End game" in the stuck prompt.
+  void resolveStuckEndGame() {
+    if (!stuckChoicePending) return;
+    stuckChoicePending = false;
     _startDisasterSequence();
   }
 
