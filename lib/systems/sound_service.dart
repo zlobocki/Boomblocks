@@ -18,6 +18,9 @@ class SoundService {
   Future<void> init() async {
     if (_ready) return;
     try {
+      // Short SFX: low-latency mode (SoundPool on Android) cuts the audible
+      // delay between an action and its sound.
+      await _player.setPlayerMode(PlayerMode.lowLatency);
       await _player.setReleaseMode(ReleaseMode.stop);
       await _player.setVolume(_volume);
       _ready = true;
