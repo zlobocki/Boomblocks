@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../controllers/game_controller.dart';
 import '../persistence/game_storage.dart';
+import '../systems/music_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/game_assets.dart';
 import 'game_screen.dart';
@@ -28,6 +29,7 @@ class _HomeScreenState extends State<HomeScreen>
       vsync: this,
       duration: const Duration(milliseconds: 2200),
     )..repeat(reverse: true);
+    MusicService.instance.start();
     _refresh();
   }
 

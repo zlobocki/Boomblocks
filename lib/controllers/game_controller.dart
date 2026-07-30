@@ -341,6 +341,9 @@ class GameController extends ChangeNotifier {
     piecesPlacedThisRound++;
 
     final clear = BoardLogic.clearCompletedLines(board);
+    if (clear.clearedCells.isEmpty) {
+      SoundService.instance.playThud();
+    }
     _handleClearResult(clear);
     _handleClearBoardBonus();
     _maybeRespawnLootIfEmpty();

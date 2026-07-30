@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../controllers/game_controller.dart';
 import '../../models/piece.dart';
+import '../../systems/audio_settings.dart';
 import '../../systems/board_logic.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/game_assets.dart';
@@ -422,6 +423,8 @@ class _GameScreenState extends State<GameScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const _VolumeControls(),
+            const Divider(height: 1, color: Color(0xFF2A221C)),
             ListTile(
               leading: const Icon(Icons.leaderboard_rounded),
               title: const Text('Top 10'),
@@ -759,6 +762,78 @@ class _GameScreenState extends State<GameScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _VolumeControls extends StatefulWidget {
+  const _VolumeControls();
+
+  @override
+  State<_VolumeControls> createState() => _VolumeControlsState();
+}
+
+class _VolumeControlsState extends State<_VolumeControls> {
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _slider(
+            icon: Icons.music_note_rounded,
+            label: 'Music',
+            value: AudioSettings.music,
+            onChanged: (v) {
+              setState(() {});
+              AudioSettings.setMusic(v);
+            },
+          ),
+          _slider(
+            icon: Icons.graphic_eq_rounded,
+            label: 'Sounds',
+            value: AudioSettings.sfx,
+            onChanged: (v) {
+              setState(() {});
+              AudioSettings.setSfx(v);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _slider({
+    required IconData icon,
+    required String label,
+    required double value,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: BoomColors.gold),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 58,
+          child: Text(
+            label,
+            style: GoogleFonts.nunito(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: BoomColors.cream,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Slider(
+            value: value,
+            onChanged: onChanged,
+            activeColor: BoomColors.copper,
+            inactiveColor: const Color(0xFF2A221C),
+          ),
+        ),
+      ],
     );
   }
 }

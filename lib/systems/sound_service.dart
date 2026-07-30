@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 
@@ -9,24 +11,31 @@ class SoundService {
   static final SoundService instance = SoundService._();
 
   final AudioPlayer _player = AudioPlayer();
+  final Random _rng = Random();
   bool _ready = false;
+  double _volume = 0.75;
 
   Future<void> init() async {
     if (_ready) return;
     try {
       await _player.setReleaseMode(ReleaseMode.stop);
-      await _player.setVolume(0.75);
+      await _player.setVolume(_volume);
       _ready = true;
     } catch (e) {
       debugPrint('SoundService init failed: $e');
     }
   }
 
+  void setVolume(double volume) {
+    _volume = volume.clamp(0.0, 1.0);
+    _player.setVolume(_volume).catchError((_) {});
+  }
+
   Future<void> _play(String asset) async {
     await init();
     try {
       await _player.stop();
-      await _player.play(AssetSource(asset));
+      await _player.play(AssetSource(asset), volume: _volume);
     } catch (e) {
       debugPrint('Sound play failed: $e');
     }
@@ -37,6 +46,10 @@ class SoundService {
         ClearSoundKind.single => 'sounds/clear_row.mp3',
         ClearSoundKind.multi => 'sounds/clear_multi.mp3',
       });
+
+  /// Block landed without clearing anything.
+  Future<void> playThud() =>
+      _play('sounds/thud${1 + _rng.nextInt(2)}.mp3');
 
   Future<void> playGameOver({required bool top10}) =>
       _play(top10 ? 'sounds/game_over_top10.mp3' : 'sounds/game_over.mp3');
