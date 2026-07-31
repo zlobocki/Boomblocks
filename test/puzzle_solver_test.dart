@@ -24,9 +24,9 @@ void main() {
     test('late-game pentomino trio is solvable on an empty board', () {
       final board = BoardLogic.emptyBoard();
       final pieces = [
-        _p('i5', PieceCatalog.pentominoI),
         _p('t5', PieceCatalog.pentominoT),
         _p('plus', PieceCatalog.plus),
+        _p('s', PieceCatalog.tetrominoS),
       ];
       expect(PuzzleSolver.isSolvable(board, pieces), isTrue);
     });

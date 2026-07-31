@@ -126,12 +126,6 @@ void main() {
     });
 
     test('late-game pentominoes have expected footprints', () {
-      expect(PieceCatalog.pentominoI.cells.length, 5);
-      expect(PieceCatalog.pentominoI.width, 5);
-      expect(PieceCatalog.pentominoI.height, 1);
-      expect(PieceCatalog.pentominoI.rotated90().width, 1);
-      expect(PieceCatalog.pentominoI.rotated90().height, 5);
-
       expect(PieceCatalog.pentominoT.cells.length, 5);
       expect(PieceCatalog.pentominoT.width, 3);
       expect(PieceCatalog.pentominoT.height, 3);
@@ -146,12 +140,20 @@ void main() {
       );
     });
 
-    test('hard bag includes new late pieces and one bigL base', () {
+    test('hard bag includes late pieces, one bigL, and boosted S/Z', () {
       final hard = PieceCatalog.hard;
-      expect(hard.where((s) => s.id == 'I5').length, 2);
+      expect(hard.any((s) => s.id == 'I5'), isFalse);
       expect(hard.where((s) => s.id == 'T5').length, 2);
       expect(hard.where((s) => s.id == 'plus').length, 2);
       expect(hard.where((s) => s.id.startsWith('bigL')).length, 1);
+      expect(hard.where((s) => s.id == 'S').length, 3);
+      expect(hard.where((s) => s.id == 'Z').length, 3);
+    });
+
+    test('medium bag includes S and Z tetrominoes', () {
+      final medium = PieceCatalog.medium;
+      expect(medium.any((s) => s.id == 'S'), isTrue);
+      expect(medium.any((s) => s.id == 'Z'), isTrue);
     });
 
     test('diagonal pieces place without filling the whole bounding box', () {

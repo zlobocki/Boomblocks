@@ -1,4 +1,4 @@
-# BoomBlocks
+# Mine Puzzle
 
 Android puzzle game: fit tetris-shaped earth blocks on an 8×8 board, clear lines, and collect gemstones.
 

@@ -15,7 +15,7 @@ class GameAssets {
   static const dynamite = 'assets/images/dynamite.png';
   static const undo = 'assets/images/undo.png';
   static const cashIcon = 'assets/images/cash_icon.png';
-  static const welcomeBg = 'assets/images/welcome_bg.jpg';
+  static const welcomeBg = 'assets/images/home.png';
 
   static String gem(String gemName) => 'assets/images/$gemName.png';
 

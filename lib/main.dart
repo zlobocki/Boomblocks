@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'systems/audio_settings.dart';
 import 'systems/music_service.dart';
+import 'theme/app_strings.dart';
 import 'theme/app_theme.dart';
 import 'theme/tile_texture.dart';
 import 'ui/home_screen.dart';
@@ -26,17 +27,17 @@ Future<void> main() async {
   // Don't block first paint on 21 tile decodes; painters fall back until
   // textures are ready.
   unawaited(TileTexture.load());
-  runApp(const BoomBlocksApp());
+  runApp(const MinePuzzleApp());
 }
 
-class BoomBlocksApp extends StatefulWidget {
-  const BoomBlocksApp({super.key});
+class MinePuzzleApp extends StatefulWidget {
+  const MinePuzzleApp({super.key});
 
   @override
-  State<BoomBlocksApp> createState() => _BoomBlocksAppState();
+  State<MinePuzzleApp> createState() => _MinePuzzleAppState();
 }
 
-class _BoomBlocksAppState extends State<BoomBlocksApp>
+class _MinePuzzleAppState extends State<MinePuzzleApp>
     with WidgetsBindingObserver {
   @override
   void initState() {
@@ -66,7 +67,7 @@ class _BoomBlocksAppState extends State<BoomBlocksApp>
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'BoomBlocks',
+      title: AppStrings.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       home: const HomeScreen(),

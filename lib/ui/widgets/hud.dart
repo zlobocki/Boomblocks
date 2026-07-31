@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../theme/app_strings.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/game_assets.dart';
 
@@ -39,7 +40,7 @@ class GameHud extends StatelessWidget {
             child: Column(
               children: [
                 Text(
-                  'BoomBlocks',
+                  AppStrings.appName,
                   maxLines: 1,
                   softWrap: false,
                   overflow: TextOverflow.visible,

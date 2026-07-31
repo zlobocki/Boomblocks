@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../controllers/game_controller.dart';
 import '../persistence/game_storage.dart';
 import '../systems/music_service.dart';
+import '../theme/app_strings.dart';
 import '../theme/app_theme.dart';
 import '../theme/game_assets.dart';
 import '../theme/responsive.dart';
@@ -64,13 +65,12 @@ class _HomeScreenState extends State<HomeScreen>
     final size = MediaQuery.sizeOf(context);
     final shortest = size.shortestSide;
     final tablet = BoomLayout.isTablet(size);
-    // Narrow phones get stronger side letterboxing so art isn't cropped hard.
     final sidePad = shortest < 360
-        ? 28.0
-        : (shortest < 400 ? 20.0 : (tablet ? 48.0 : 12.0));
+        ? 20.0
+        : (shortest < 400 ? 16.0 : (tablet ? 48.0 : 12.0));
     final titleSize = tablet
-        ? (shortest * 0.08).clamp(44.0, 72.0)
-        : (shortest * 0.11).clamp(28.0, 48.0);
+        ? (shortest * 0.09).clamp(48.0, 76.0)
+        : (shortest * 0.12).clamp(34.0, 52.0);
     final actionsMax = BoomLayout.homeActionsMaxWidth(size);
 
     return Scaffold(
@@ -78,19 +78,14 @@ class _HomeScreenState extends State<HomeScreen>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Cover the screen, but inset the painted art so edges aren't clipped
-          // as aggressively on tall/narrow phones.
           Positioned.fill(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: sidePad * 0.35),
-              child: Image.asset(
-                GameAssets.welcomeBg,
-                fit: BoxFit.cover,
-                alignment: const Alignment(0, -0.15),
-              ),
+            child: Image.asset(
+              GameAssets.welcomeBg,
+              fit: BoxFit.cover,
+              alignment: const Alignment(0, -0.05),
             ),
           ),
-          // Side vignette bars for narrow screens
+          // Soft side vignette so edge tools don't fight the CTAs on narrow phones.
           Positioned.fill(
             child: IgnorePointer(
               child: DecoratedBox(
@@ -99,14 +94,14 @@ class _HomeScreenState extends State<HomeScreen>
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                     colors: [
-                      BoomColors.skyBottom.withValues(alpha: 0.92),
+                      BoomColors.skyBottom.withValues(alpha: 0.55),
                       Colors.transparent,
                       Colors.transparent,
-                      BoomColors.skyBottom.withValues(alpha: 0.92),
+                      BoomColors.skyBottom.withValues(alpha: 0.55),
                     ],
                     stops: shortest < 380
-                        ? const [0.0, 0.08, 0.92, 1.0]
-                        : const [0.0, 0.04, 0.96, 1.0],
+                        ? const [0.0, 0.12, 0.88, 1.0]
+                        : const [0.0, 0.06, 0.94, 1.0],
                   ),
                 ),
               ),
@@ -123,19 +118,19 @@ class _HomeScreenState extends State<HomeScreen>
                     end: Alignment.bottomCenter,
                     colors: [
                       Color.lerp(
-                        const Color(0x66000000),
-                        const Color(0x44000000),
+                        const Color(0x99000000),
+                        const Color(0x77000000),
                         t,
                       )!,
                       Colors.transparent,
                       Color.lerp(
-                        const Color(0xAA120A06),
+                        const Color(0x99120A06),
                         const Color(0xBB1A0F08),
                         t,
                       )!,
                       const Color(0xF00B0907),
                     ],
-                    stops: const [0.0, 0.35, 0.66, 1.0],
+                    stops: const [0.0, 0.32, 0.62, 1.0],
                   ),
                 ),
               );
@@ -147,11 +142,10 @@ class _HomeScreenState extends State<HomeScreen>
               child: Column(
                 children: [
                   const SizedBox(height: 28),
-                  // Brand lives in Flutter so it always fits the device width.
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
-                      'BoomBlocks',
+                      AppStrings.appName,
                       maxLines: 1,
                       softWrap: false,
                       style: GoogleFonts.fredoka(
@@ -162,8 +156,13 @@ class _HomeScreenState extends State<HomeScreen>
                         shadows: const [
                           Shadow(
                             color: Color(0xCC000000),
-                            blurRadius: 10,
+                            blurRadius: 12,
                             offset: Offset(0, 3),
+                          ),
+                          Shadow(
+                            color: Color(0x88000000),
+                            blurRadius: 2,
+                            offset: Offset(0, 1),
                           ),
                         ],
                       ),
@@ -175,7 +174,7 @@ class _HomeScreenState extends State<HomeScreen>
                     child: Column(
                       children: [
                         Text(
-                          'Clear loot to score points',
+                          AppStrings.tagline,
                           textAlign: TextAlign.center,
                           style: GoogleFonts.nunito(
                             fontSize: tablet ? 18 : 15,

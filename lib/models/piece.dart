@@ -207,11 +207,6 @@ class PieceCatalog {
     const Point(2, 2),
   ]);
 
-  /// Straight pentomino — 5×1 bar.
-  static final pentominoI = PieceShape('I5', [
-    for (var x = 0; x < 5; x++) Point<int>(x, 0),
-  ]);
-
   /// T pentomino in a 3×3 footprint (5 cells).
   static final pentominoT = PieceShape('T5', [
     const Point(0, 0),
@@ -251,6 +246,9 @@ class PieceCatalog {
         tetrominoT,
         tetrominoL,
         tetrominoJ,
+        // S/Z only lived in hard before — they never appeared mid-game.
+        tetrominoS,
+        tetrominoZ,
         square3,
         rect3x2,
         rect2x3,
@@ -261,12 +259,17 @@ class PieceCatalog {
 
   /// Late-game bag. Only one `bigL` base shape is listed — deals already apply
   /// random rotations — so L-pentominoes aren't over-weighted vs new shapes.
+  /// S/Z are triple-weighted so they keep pace with other hard shapes.
   static List<PieceShape> get hard => [
         tetrominoI,
         tetrominoT,
         tetrominoL,
         tetrominoJ,
         tetrominoS,
+        tetrominoS,
+        tetrominoS,
+        tetrominoZ,
+        tetrominoZ,
         tetrominoZ,
         square3,
         square3,
@@ -275,8 +278,6 @@ class PieceCatalog {
         diag3,
         diag3,
         bigL0,
-        pentominoI,
-        pentominoI,
         pentominoT,
         pentominoT,
         plus,

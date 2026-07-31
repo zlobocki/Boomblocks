@@ -7,7 +7,7 @@
         android:anyDensity="true"
         android:resizeable="true" />
     <application
-        android:label="BoomBlocks"
+        android:label="Mine Puzzle"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round">
