@@ -125,6 +125,35 @@ void main() {
       expect(PieceCatalog.diag3.height, 3);
     });
 
+    test('late-game pentominoes have expected footprints', () {
+      expect(PieceCatalog.pentominoI.cells.length, 5);
+      expect(PieceCatalog.pentominoI.width, 5);
+      expect(PieceCatalog.pentominoI.height, 1);
+      expect(PieceCatalog.pentominoI.rotated90().width, 1);
+      expect(PieceCatalog.pentominoI.rotated90().height, 5);
+
+      expect(PieceCatalog.pentominoT.cells.length, 5);
+      expect(PieceCatalog.pentominoT.width, 3);
+      expect(PieceCatalog.pentominoT.height, 3);
+
+      expect(PieceCatalog.plus.cells.length, 5);
+      expect(PieceCatalog.plus.width, 3);
+      expect(PieceCatalog.plus.height, 3);
+      // Plus is rotationally symmetric.
+      expect(
+        PieceCatalog.plus.rotated90().cells.toSet(),
+        PieceCatalog.plus.cells.toSet(),
+      );
+    });
+
+    test('hard bag includes new late pieces and one bigL base', () {
+      final hard = PieceCatalog.hard;
+      expect(hard.where((s) => s.id == 'I5').length, 2);
+      expect(hard.where((s) => s.id == 'T5').length, 2);
+      expect(hard.where((s) => s.id == 'plus').length, 2);
+      expect(hard.where((s) => s.id.startsWith('bigL')).length, 1);
+    });
+
     test('diagonal pieces place without filling the whole bounding box', () {
       final board = BoardLogic.emptyBoard();
       board[0][1].placeEarth();

@@ -21,6 +21,16 @@ void main() {
       );
     });
 
+    test('late-game pentomino trio is solvable on an empty board', () {
+      final board = BoardLogic.emptyBoard();
+      final pieces = [
+        _p('i5', PieceCatalog.pentominoI),
+        _p('t5', PieceCatalog.pentominoT),
+        _p('plus', PieceCatalog.plus),
+      ];
+      expect(PuzzleSolver.isSolvable(board, pieces), isTrue);
+    });
+
     test('full board is unsolvable without consumables', () {
       final board = BoardLogic.emptyBoard();
       for (var r = 0; r < 8; r++) {
