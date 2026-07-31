@@ -14,9 +14,13 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Fonts ship in assets/google_fonts/ — never fetch over the network.
   GoogleFonts.config.allowRuntimeFetching = false;
-  await SystemChrome.setPreferredOrientations([
+  // Phones stay comfortable in portrait; tablets / foldables may rotate.
+  // GameScreen picks a stacked or side-by-side layout from the viewport.
+  await SystemChrome.setPreferredOrientations(const [
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
   ]);
   await AudioSettings.load();
   // Don't block first paint on 21 tile decodes; painters fall back until

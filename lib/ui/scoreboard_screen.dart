@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../controllers/game_controller.dart';
 import '../models/high_score.dart';
 import '../theme/app_theme.dart';
+import '../theme/responsive.dart';
 
 class ScoreboardScreen extends StatelessWidget {
   const ScoreboardScreen({super.key, required this.controller});
@@ -44,72 +45,78 @@ class ScoreboardScreen extends StatelessWidget {
                 ),
               );
             }
-            return ListView.separated(
-              padding: const EdgeInsets.all(20),
-              itemCount: scores.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, i) {
-                final e = scores[i];
-                final date = DateTime.tryParse(e.dateIso);
-                return Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: BoomColors.hud.withValues(alpha: 0.95),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: BoomColors.frameGold.withValues(alpha: 0.4),
+            return BoomPageBody(
+              padding: EdgeInsets.zero,
+              child: ListView.separated(
+                padding: const EdgeInsets.all(20),
+                itemCount: scores.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, i) {
+                  final e = scores[i];
+                  final date = DateTime.tryParse(e.dateIso);
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor:
-                            i == 0 ? BoomColors.rope : BoomColors.earth,
-                        child: Text(
-                          '${i + 1}',
-                          style: GoogleFonts.nunito(
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
+                    decoration: BoxDecoration(
+                      color: BoomColors.hud.withValues(alpha: 0.95),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: BoomColors.frameGold.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor:
+                              i == 0 ? BoomColors.rope : BoomColors.earth,
+                          child: Text(
+                            '${i + 1}',
+                            style: GoogleFonts.nunito(
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              e.name,
-                              style: GoogleFonts.nunito(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: BoomColors.cream,
-                              ),
-                            ),
-                            if (date != null)
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Text(
-                                '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+                                e.name,
                                 style: GoogleFonts.nunito(
-                                  fontSize: 12,
-                                  color: BoomColors.dust.withValues(alpha: 0.75),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: BoomColors.cream,
                                 ),
                               ),
-                          ],
+                              if (date != null)
+                                Text(
+                                  '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 12,
+                                    color:
+                                        BoomColors.dust.withValues(alpha: 0.75),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                      Text(
-                        '\$${e.score}',
-                        style: GoogleFonts.nunito(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: BoomColors.gold,
+                        Text(
+                          '\$${e.score}',
+                          style: GoogleFonts.nunito(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: BoomColors.gold,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              },
+                      ],
+                    ),
+                  );
+                },
+              ),
             );
           },
         ),

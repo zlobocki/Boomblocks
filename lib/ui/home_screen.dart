@@ -6,6 +6,7 @@ import '../persistence/game_storage.dart';
 import '../systems/music_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/game_assets.dart';
+import '../theme/responsive.dart';
 import 'game_screen.dart';
 import 'scoreboard_screen.dart';
 
@@ -62,9 +63,15 @@ class _HomeScreenState extends State<HomeScreen>
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final shortest = size.shortestSide;
+    final tablet = BoomLayout.isTablet(size);
     // Narrow phones get stronger side letterboxing so art isn't cropped hard.
-    final sidePad = shortest < 360 ? 28.0 : (shortest < 400 ? 20.0 : 12.0);
-    final titleSize = (shortest * 0.11).clamp(28.0, 48.0);
+    final sidePad = shortest < 360
+        ? 28.0
+        : (shortest < 400 ? 20.0 : (tablet ? 48.0 : 12.0));
+    final titleSize = tablet
+        ? (shortest * 0.08).clamp(44.0, 72.0)
+        : (shortest * 0.11).clamp(28.0, 48.0);
+    final actionsMax = BoomLayout.homeActionsMaxWidth(size);
 
     return Scaffold(
       backgroundColor: BoomColors.skyBottom,
@@ -163,90 +170,100 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                   ),
                   const Spacer(flex: 5),
-                  Text(
-                    'Clear loot to score points',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.nunito(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      height: 1.25,
-                      color: BoomColors.cream.withValues(alpha: 0.95),
-                      shadows: const [
-                        Shadow(
-                          color: Color(0xAA000000),
-                          blurRadius: 8,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  if (_hasSave) ...[
-                    _MineButton(
-                      label: 'Continue',
-                      filled: true,
-                      onPressed: () => _start(continueGame: true),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  _MineButton(
-                    label: _hasSave ? 'New game' : 'Play',
-                    filled: !_hasSave,
-                    onPressed: () async {
-                      if (_hasSave) {
-                        final ok = await showDialog<bool>(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            backgroundColor: BoomColors.hud,
-                            title: Text(
-                              'New game?',
-                              style: GoogleFonts.fredoka(
-                                color: BoomColors.gold,
-                              ),
-                            ),
-                            content: Text(
-                              'This will replace your saved run.',
-                              style: GoogleFonts.nunito(
-                                color: BoomColors.cream,
-                              ),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx, false),
-                                child: const Text('Cancel'),
-                              ),
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx, true),
-                                child: const Text('New game'),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: actionsMax),
+                    child: Column(
+                      children: [
+                        Text(
+                          'Clear loot to score points',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.nunito(
+                            fontSize: tablet ? 18 : 15,
+                            fontWeight: FontWeight.w800,
+                            height: 1.25,
+                            color: BoomColors.cream.withValues(alpha: 0.95),
+                            shadows: const [
+                              Shadow(
+                                color: Color(0xAA000000),
+                                blurRadius: 8,
                               ),
                             ],
                           ),
-                        );
-                        if (ok != true) return;
-                        await _storage.clearGame();
-                      }
-                      if (!mounted) return;
-                      _start(continueGame: false);
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ScoreboardScreen(
-                            controller: GameController(storage: _storage),
+                        ),
+                        const SizedBox(height: 18),
+                        if (_hasSave) ...[
+                          _MineButton(
+                            label: 'Continue',
+                            filled: true,
+                            onPressed: () => _start(continueGame: true),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        _MineButton(
+                          label: _hasSave ? 'New game' : 'Play',
+                          filled: !_hasSave,
+                          onPressed: () async {
+                            if (_hasSave) {
+                              final ok = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  backgroundColor: BoomColors.hud,
+                                  title: Text(
+                                    'New game?',
+                                    style: GoogleFonts.fredoka(
+                                      color: BoomColors.gold,
+                                    ),
+                                  ),
+                                  content: Text(
+                                    'This will replace your saved run.',
+                                    style: GoogleFonts.nunito(
+                                      color: BoomColors.cream,
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(ctx, false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(ctx, true),
+                                      child: const Text('New game'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (ok != true) return;
+                              await _storage.clearGame();
+                            }
+                            if (!mounted) return;
+                            _start(continueGame: false);
+                          },
+                        ),
+                        const SizedBox(height: 14),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ScoreboardScreen(
+                                  controller:
+                                      GameController(storage: _storage),
+                                ),
+                              ),
+                            );
+                          },
+                          child: Text(
+                            'Top 10',
+                            style: GoogleFonts.nunito(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 17,
+                              color: BoomColors.cream,
+                            ),
                           ),
                         ),
-                      );
-                    },
-                    child: Text(
-                      'Top 10',
-                      style: GoogleFonts.nunito(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 17,
-                        color: BoomColors.cream,
-                      ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 24),

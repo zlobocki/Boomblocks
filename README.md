@@ -11,7 +11,8 @@ Android puzzle game: fit tetris-shaped earth blocks on an 8×8 board, clear line
 - Renewable **Rope** (rotate a tray piece) and **Dynamite** (3×3 clear) with separate progress meters
 - Difficulty ramp: harder pieces + slower item renewal
 - Local save / continue + top-10 scoreboard with name prompt
-- Soft casual cartoon UI, portrait phone first
+- Adaptive Android launcher icons (layered foreground + cave background)
+- Responsive UI: larger board on tablets; side-by-side board/tray in landscape
 
 ## Run
 

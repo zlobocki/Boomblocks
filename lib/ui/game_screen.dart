@@ -7,6 +7,7 @@ import '../../systems/audio_settings.dart';
 import '../../systems/board_logic.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/game_assets.dart';
+import '../../theme/responsive.dart';
 import 'how_to_play_screen.dart';
 import 'scoreboard_screen.dart';
 import 'widgets/board_widget.dart';
@@ -478,6 +479,214 @@ class _GameScreenState extends State<GameScreen> {
         for (final p in c.explodingCells) (p.y, p.x),
       };
 
+  Widget _buildBoard() {
+    return KeyedSubtree(
+      key: _boardKey,
+      child: BoardWidget(
+        board: c.board,
+        cellSize: _cellSize,
+        previewShape: _previewShape,
+        previewRow: _previewRow,
+        previewCol: _previewCol,
+        previewValid: _previewValid,
+        highlightRows: _highlightRows,
+        highlightCols: _highlightCols,
+        explodingCells: _explodingCellSet,
+        explosionEventId: c.explosionEventId,
+        onShatterComplete: c.clearExplosion,
+        dynamiteHoverRow: _draggingDynamite ? _dynamiteRow : null,
+        dynamiteHoverCol: _draggingDynamite ? _dynamiteCol : null,
+      ),
+    );
+  }
+
+  Widget _buildTray({required double maxWidth}) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+        decoration: BoxDecoration(
+          color: BoomColors.tray.withValues(alpha: 0.95),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: BoomColors.frameGold.withValues(alpha: 0.45),
+          ),
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            const gap = 6.0;
+            final slotW = (constraints.maxWidth - gap * 2) / 3;
+            const maxCells = 4;
+            final pieceCell =
+                ((slotW - 8) / maxCells).clamp(12.0, _cellSize * 0.7);
+            return Row(
+              children: List.generate(3, (i) {
+                final piece = c.tray[i];
+                return Padding(
+                  padding: EdgeInsets.only(left: i == 0 ? 0 : gap),
+                  child: SizedBox(
+                    key: _trayKeys[i],
+                    width: slotW,
+                    child: _TraySlot(
+                      piece: piece,
+                      slotSize: slotW,
+                      cellSize: pieceCell,
+                      highlighted:
+                          _draggingRope && _ropeHoverTrayIndex == i,
+                      dragging: _dragTrayIndex == i,
+                      onTap: piece != null && piece.hasRope
+                          ? () => c.rotatePiece(i)
+                          : null,
+                      onDragStart: (global) {
+                        if (piece == null) return;
+                        setState(() {
+                          _dragTrayIndex = i;
+                          _pointerGlobal = global;
+                        });
+                        _updatePieceSnap(global, piece);
+                      },
+                      onDragUpdate: (global) {
+                        final p = c.tray[i];
+                        if (p == null) return;
+                        _updatePieceSnap(global, p);
+                      },
+                      onDragEnd: _endPieceDrag,
+                      onDragCancel: _clearDrag,
+                    ),
+                  ),
+                );
+              }),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildItemRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        ItemSlot(
+          label: 'Rope',
+          assetPath: GameAssets.rope,
+          meter: c.inventory.rope,
+          accent: BoomColors.rope,
+          showMax: _showRopeMax,
+          dragging: _draggingRope,
+          onDragStart: (global) {
+            setState(() {
+              _draggingRope = true;
+              _pointerGlobal = global;
+            });
+            _updateRopeHover(global);
+          },
+          onDragUpdate: _updateRopeHover,
+          onDragEnd: _endRopeDrag,
+        ),
+        const SizedBox(width: 18),
+        ItemSlot(
+          label: 'Dynamite',
+          assetPath: GameAssets.dynamite,
+          meter: c.inventory.dynamite,
+          accent: BoomColors.dynamite,
+          showMax: _showDynMax,
+          dragging: _draggingDynamite,
+          onDragStart: (global) {
+            setState(() {
+              _draggingDynamite = true;
+              _pointerGlobal = global;
+            });
+            _updateDynamiteSnap(global);
+          },
+          onDragUpdate: _updateDynamiteSnap,
+          onDragEnd: _endDynamiteDrag,
+        ),
+        const SizedBox(width: 18),
+        ItemSlot(
+          label: 'Undo',
+          assetPath: GameAssets.undo,
+          meter: c.inventory.undo,
+          accent: BoomColors.undo,
+          showMax: _showUndoMax,
+          enabled: c.canUndoPlacement,
+          onTap: () => c.undoLastPlacement(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPortraitLayout(double boardOuter) {
+    return Column(
+      children: [
+        GameHud(
+          score: c.score,
+          round: c.round,
+          lootProgress: c.gemsCollectedTowardReset,
+          lootGoal: GameController.lootResetAt,
+          scoreToast: c.lastScoreToast,
+          onMenu: _openMenu,
+          scoreKey: _scoreKey,
+        ),
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Center(child: _buildBoard()),
+        ),
+        const Spacer(),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Center(child: _buildTray(maxWidth: boardOuter)),
+        ),
+        const SizedBox(height: 10),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: _buildItemRow(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWideLayout(double boardOuter) {
+    return Column(
+      children: [
+        GameHud(
+          score: c.score,
+          round: c.round,
+          lootProgress: c.gemsCollectedTowardReset,
+          lootGoal: GameController.lootResetAt,
+          scoreToast: c.lastScoreToast,
+          onMenu: _openMenu,
+          scoreKey: _scoreKey,
+        ),
+        Expanded(
+          child: Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: Center(child: _buildBoard()),
+              ),
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 16, 16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildTray(maxWidth: boardOuter * 0.95),
+                      const SizedBox(height: 18),
+                      _buildItemRow(),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!c.loaded) {
@@ -486,9 +695,17 @@ class _GameScreenState extends State<GameScreen> {
       );
     }
 
-    final width = MediaQuery.sizeOf(context).width;
-    // Reserve room for board frame inset so the grid isn't clipped.
-    final maxOuter = (width - 32).clamp(280.0, 420.0);
+    final size = MediaQuery.sizeOf(context);
+    final padding = MediaQuery.paddingOf(context);
+    final wide = BoomLayout.useWideGameLayout(size);
+    const hudHeight = 72.0;
+    final maxOuter = wide
+        ? BoomLayout.wideBoardOuter(
+            size: size,
+            hudHeight: hudHeight,
+            padding: padding,
+          )
+        : BoomLayout.portraitBoardOuter(size);
     _cellSize =
         (maxOuter - BoardWidget.contentInset * 2) / BoardLogic.size;
 
@@ -514,164 +731,9 @@ class _GameScreenState extends State<GameScreen> {
         child: Stack(
           children: [
             SafeArea(
-              child: Column(
-                children: [
-                  GameHud(
-                    score: c.score,
-                    round: c.round,
-                    lootProgress: c.gemsCollectedTowardReset,
-                    lootGoal: GameController.lootResetAt,
-                    scoreToast: c.lastScoreToast,
-                    onMenu: _openMenu,
-                    scoreKey: _scoreKey,
-                  ),
-                  const SizedBox(height: 4),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Center(
-                      child: KeyedSubtree(
-                        key: _boardKey,
-                        child: BoardWidget(
-                          board: c.board,
-                          cellSize: _cellSize,
-                          previewShape: _previewShape,
-                          previewRow: _previewRow,
-                          previewCol: _previewCol,
-                          previewValid: _previewValid,
-                          highlightRows: _highlightRows,
-                          highlightCols: _highlightCols,
-                          explodingCells: _explodingCellSet,
-                          explosionEventId: c.explosionEventId,
-                          onShatterComplete: c.clearExplosion,
-                          dynamiteHoverRow:
-                              _draggingDynamite ? _dynamiteRow : null,
-                          dynamiteHoverCol:
-                              _draggingDynamite ? _dynamiteCol : null,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 10,
-                        horizontal: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: BoomColors.tray.withValues(alpha: 0.95),
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(
-                          color: BoomColors.frameGold.withValues(alpha: 0.45),
-                        ),
-                      ),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          const gap = 6.0;
-                          final slotW = (constraints.maxWidth - gap * 2) / 3;
-                          const maxCells = 4;
-                          final pieceCell = ((slotW - 8) / maxCells)
-                              .clamp(12.0, _cellSize * 0.7);
-                          return Row(
-                            children: List.generate(3, (i) {
-                              final piece = c.tray[i];
-                              return Padding(
-                                padding:
-                                    EdgeInsets.only(left: i == 0 ? 0 : gap),
-                                child: SizedBox(
-                                  key: _trayKeys[i],
-                                  width: slotW,
-                                  child: _TraySlot(
-                                    piece: piece,
-                                    slotSize: slotW,
-                                    cellSize: pieceCell,
-                                    highlighted: _draggingRope &&
-                                        _ropeHoverTrayIndex == i,
-                                    dragging: _dragTrayIndex == i,
-                                    onTap: piece != null && piece.hasRope
-                                        ? () => c.rotatePiece(i)
-                                        : null,
-                                    onDragStart: (global) {
-                                      if (piece == null) return;
-                                      setState(() {
-                                        _dragTrayIndex = i;
-                                        _pointerGlobal = global;
-                                      });
-                                      _updatePieceSnap(global, piece);
-                                    },
-                                    onDragUpdate: (global) {
-                                      final p = c.tray[i];
-                                      if (p == null) return;
-                                      _updatePieceSnap(global, p);
-                                    },
-                                    onDragEnd: _endPieceDrag,
-                                    onDragCancel: _clearDrag,
-                                  ),
-                                ),
-                              );
-                            }),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        ItemSlot(
-                          label: 'Rope',
-                          assetPath: GameAssets.rope,
-                          meter: c.inventory.rope,
-                          accent: BoomColors.rope,
-                          showMax: _showRopeMax,
-                          dragging: _draggingRope,
-                          onDragStart: (global) {
-                            setState(() {
-                              _draggingRope = true;
-                              _pointerGlobal = global;
-                            });
-                            _updateRopeHover(global);
-                          },
-                          onDragUpdate: _updateRopeHover,
-                          onDragEnd: _endRopeDrag,
-                        ),
-                        const SizedBox(width: 18),
-                        ItemSlot(
-                          label: 'Dynamite',
-                          assetPath: GameAssets.dynamite,
-                          meter: c.inventory.dynamite,
-                          accent: BoomColors.dynamite,
-                          showMax: _showDynMax,
-                          dragging: _draggingDynamite,
-                          onDragStart: (global) {
-                            setState(() {
-                              _draggingDynamite = true;
-                              _pointerGlobal = global;
-                            });
-                            _updateDynamiteSnap(global);
-                          },
-                          onDragUpdate: _updateDynamiteSnap,
-                          onDragEnd: _endDynamiteDrag,
-                        ),
-                        const SizedBox(width: 18),
-                        ItemSlot(
-                          label: 'Undo',
-                          assetPath: GameAssets.undo,
-                          meter: c.inventory.undo,
-                          accent: BoomColors.undo,
-                          showMax: _showUndoMax,
-                          enabled: c.canUndoPlacement,
-                          onTap: () => c.undoLastPlacement(),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+              child: wide
+                  ? _buildWideLayout(maxOuter)
+                  : _buildPortraitLayout(maxOuter),
             ),
             if (draggingPiece != null && localPointer != null)
               Positioned(

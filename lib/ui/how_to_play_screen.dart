@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/app_theme.dart';
+import '../theme/responsive.dart';
 
 class HowToPlayScreen extends StatelessWidget {
   const HowToPlayScreen({super.key});
@@ -21,59 +22,60 @@ class HowToPlayScreen extends StatelessWidget {
             colors: [BoomColors.skyTop, BoomColors.skyBottom],
           ),
         ),
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-          children: const [
-            _Section(
-              title: 'Dig for treasure',
-              body:
-                  'Place earth blocks on the 8×8 board. Every piece of dirt '
-                  'hides something — gems, fossils, or empty ground. Clear '
-                  'full rows and columns to dig them up.',
-            ),
-            _Section(
-              title: 'Clear lines, earn cash',
-              body:
-                  'A full row or column vanishes and pays out whatever was '
-                  'buried in it. Fossils dig up for \$0 but still count as '
-                  'finds.\n\n'
-                  '• Silver \$5\n'
-                  '• Gold \$10\n'
-                  '• Emerald \$15\n'
-                  '• Ruby \$25\n'
-                  '• Diamond \$50',
-            ),
-            _Section(
-              title: 'Fresh loot',
-              body:
-                  'After you\'ve collected 7 items (gems or fossils), the '
-                  'underground resets with a new mix. Better gems unlock as '
-                  'you dig deeper.',
-            ),
-            _Section(
-              title: 'Three tools',
-              body:
-                  '• Rope — rotate a piece before you place it\n'
-                  '• Dynamite — blast a piece off the board (and dig '
-                  'whatever it was sitting on)\n'
-                  '• Undo — take back your last placement\n\n'
-                  'Each tool starts charged once and holds up to 2 uses. '
-                  'Spending cash recharges them.',
-            ),
-            _Section(
-              title: 'Every deal is solvable',
-              body:
-                  'The three pieces you\'re dealt can always be placed — '
-                  'sometimes with a clever rotation or a well-timed blast. '
-                  'If nothing fits and you\'re out of dynamite, the run is '
-                  'over. Undo is your last chance when you\'re stuck.',
-            ),
-            _Section(
-              title: 'Top 10',
-              body:
-                  'Your best digs are saved. Crack the leaderboard.',
-            ),
-          ],
+        child: BoomPageBody(
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: const [
+              _Section(
+                title: 'Dig for treasure',
+                body:
+                    'Place earth blocks on the 8×8 board. Every piece of dirt '
+                    'hides something — gems, fossils, or empty ground. Clear '
+                    'full rows and columns to dig them up.',
+              ),
+              _Section(
+                title: 'Clear lines, earn cash',
+                body:
+                    'A full row or column vanishes and pays out whatever was '
+                    'buried in it. Fossils dig up for \$0 but still count as '
+                    'finds.\n\n'
+                    '• Silver \$5\n'
+                    '• Gold \$10\n'
+                    '• Emerald \$15\n'
+                    '• Ruby \$25\n'
+                    '• Diamond \$50',
+              ),
+              _Section(
+                title: 'Fresh loot',
+                body:
+                    'After you\'ve collected 7 items (gems or fossils), the '
+                    'underground resets with a new mix. Better gems unlock as '
+                    'you dig deeper.',
+              ),
+              _Section(
+                title: 'Three tools',
+                body:
+                    '• Rope — rotate a piece before you place it\n'
+                    '• Dynamite — blast a piece off the board (and dig '
+                    'whatever it was sitting on)\n'
+                    '• Undo — take back your last placement\n\n'
+                    'Each tool starts charged once and holds up to 2 uses. '
+                    'Spending cash recharges them.',
+              ),
+              _Section(
+                title: 'Every deal is solvable',
+                body:
+                    'The three pieces you\'re dealt can always be placed — '
+                    'sometimes with a clever rotation or a well-timed blast. '
+                    'If nothing fits and you\'re out of dynamite, the run is '
+                    'over. Undo is your last chance when you\'re stuck.',
+              ),
+              _Section(
+                title: 'Top 10',
+                body: 'Your best digs are saved. Crack the leaderboard.',
+              ),
+            ],
+          ),
         ),
       ),
     );
