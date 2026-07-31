@@ -7,6 +7,7 @@ import '../../systems/audio_settings.dart';
 import '../../systems/board_logic.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/game_assets.dart';
+import 'how_to_play_screen.dart';
 import 'scoreboard_screen.dart';
 import 'widgets/board_widget.dart';
 import 'widgets/dollar_flight.dart';
@@ -425,6 +426,19 @@ class _GameScreenState extends State<GameScreen> {
           children: [
             const _VolumeControls(),
             const Divider(height: 1, color: Color(0xFF2A221C)),
+            ListTile(
+              leading: const Icon(Icons.menu_book_rounded),
+              title: const Text('How to Play'),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const HowToPlayScreen(),
+                  ),
+                );
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.leaderboard_rounded),
               title: const Text('Top 10'),
