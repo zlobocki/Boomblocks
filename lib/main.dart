@@ -27,6 +27,7 @@ Future<void> main() async {
   // Don't block first paint on 21 tile decodes; painters fall back until
   // textures are ready.
   unawaited(TileTexture.load());
+  // Music starts with the home screen so the chosen track is already loaded.
   runApp(const MinePuzzleApp());
 }
 

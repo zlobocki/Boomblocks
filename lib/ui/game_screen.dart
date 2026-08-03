@@ -5,6 +5,7 @@ import '../../controllers/game_controller.dart';
 import '../../models/piece.dart';
 import '../../systems/audio_settings.dart';
 import '../../systems/board_logic.dart';
+import '../../systems/music_service.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/game_assets.dart';
 import '../../theme/responsive.dart';
@@ -134,7 +135,8 @@ class _GameScreenState extends State<GameScreen> {
           ),
         ),
         content: Text(
-          'You can undo your last move (uses 1 undo) or end the game.',
+          'You can undo this round (uses 1 undo) — restoring the board, '
+          'pieces, loot, and consumables — or end the game.',
           style: GoogleFonts.nunito(color: BoomColors.cream),
         ),
         actions: [
@@ -144,7 +146,7 @@ class _GameScreenState extends State<GameScreen> {
               c.resolveStuckWithUndo();
             },
             child: Text(
-              'Undo last move',
+              'Undo round',
               style: GoogleFonts.nunito(
                 fontWeight: FontWeight.w800,
                 color: BoomColors.gold,
@@ -856,7 +858,45 @@ class _VolumeControlsState extends State<_VolumeControls> {
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Text(
+            'Soundtrack',
+            style: GoogleFonts.nunito(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: BoomColors.dust.withValues(alpha: 0.9),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final mode in MusicMode.values)
+                ChoiceChip(
+                  label: Text(mode.label),
+                  selected: AudioSettings.musicMode == mode,
+                  onSelected: (_) async {
+                    await AudioSettings.setMusicMode(mode);
+                    if (mounted) setState(() {});
+                  },
+                  selectedColor: BoomColors.copper.withValues(alpha: 0.85),
+                  labelStyle: GoogleFonts.nunito(
+                    fontWeight: FontWeight.w800,
+                    color: AudioSettings.musicMode == mode
+                        ? BoomColors.cream
+                        : BoomColors.cream.withValues(alpha: 0.85),
+                    fontSize: 13,
+                  ),
+                  backgroundColor: const Color(0xFF1A140F),
+                  side: BorderSide(
+                    color: BoomColors.frameGold.withValues(alpha: 0.45),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
           _slider(
             icon: Icons.music_note_rounded,
             label: 'Music',

@@ -16,14 +16,19 @@ import '../theme/tile_texture.dart';
 
 enum GameStatus { playing, disaster, exploding, gameOver }
 
-class PlacementSnapshot {
-  PlacementSnapshot({
+/// Full game state at the start of a deal / round, used by Undo.
+class RoundCheckpoint {
+  RoundCheckpoint({
     required this.board,
     required this.tray,
     required this.score,
     required this.gemsCollectedTowardReset,
     required this.piecesPlacedThisRound,
     required this.inventory,
+    required this.round,
+    required this.difficultyLevel,
+    required this.tileIndex,
+    required this.tileHistory,
   });
 
   final List<List<BoardCell>> board;
@@ -32,6 +37,60 @@ class PlacementSnapshot {
   final int gemsCollectedTowardReset;
   final int piecesPlacedThisRound;
   final Inventory inventory;
+  final int round;
+  final int difficultyLevel;
+  final int tileIndex;
+  final List<int> tileHistory;
+
+  Map<String, dynamic> toJson() => {
+        'board':
+            board.map((row) => row.map((c) => c.toJson()).toList()).toList(),
+        'tray': tray.map((p) => p?.toJson()).toList(),
+        'score': score,
+        'gemsCollectedTowardReset': gemsCollectedTowardReset,
+        'piecesPlacedThisRound': piecesPlacedThisRound,
+        'inventory': inventory.toJson(),
+        'round': round,
+        'difficultyLevel': difficultyLevel,
+        'tileIndex': tileIndex,
+        'tileHistory': tileHistory,
+      };
+
+  static RoundCheckpoint fromJson(Map<String, dynamic> json) {
+    final tray = (json['tray'] as List).map((p) {
+      if (p == null) return null;
+      return TrayPiece.fromJson(Map<String, dynamic>.from(p as Map));
+    }).toList();
+    while (tray.length < 3) {
+      tray.add(null);
+    }
+    return RoundCheckpoint(
+      board: (json['board'] as List)
+          .map(
+            (row) => (row as List)
+                .map(
+                  (c) =>
+                      BoardCell.fromJson(Map<String, dynamic>.from(c as Map)),
+                )
+                .toList(),
+          )
+          .toList(),
+      tray: tray,
+      score: json['score'] as int? ?? 0,
+      gemsCollectedTowardReset: json['gemsCollectedTowardReset'] as int? ?? 0,
+      piecesPlacedThisRound: json['piecesPlacedThisRound'] as int? ?? 0,
+      inventory: Inventory.fromJson(
+        Map<String, dynamic>.from(json['inventory'] as Map),
+      ),
+      round: json['round'] as int? ?? 1,
+      difficultyLevel: json['difficultyLevel'] as int? ?? 1,
+      tileIndex: json['tileIndex'] as int? ?? 1,
+      tileHistory: [
+        for (final t in (json['tileHistory'] as List? ?? const []))
+          (t as num).toInt(),
+      ],
+    );
+  }
 }
 
 class GameController extends ChangeNotifier {
@@ -53,8 +112,8 @@ class GameController extends ChangeNotifier {
   String? lastScoreToast;
   bool loaded = false;
 
-  /// True when the player is stuck (no fits, no dynamite) but still holds a
-  /// usable undo: the UI must ask "undo last move or end game?".
+  /// True when the player is stuck (no fits, no dynamite) but can still undo
+  /// the round: the UI must ask "undo round or end game?".
   bool stuckChoicePending = false;
 
   final Random _rng = Random();
@@ -77,10 +136,17 @@ class GameController extends ChangeNotifier {
   List<Point<int>> explodingCells = [];
   int explosionEventId = 0;
 
-  PlacementSnapshot? _undoSnapshot;
+  /// State at the last deal. Undo restores this whole checkpoint.
+  RoundCheckpoint? _roundCheckpoint;
+
+  /// True after any placement / rope / dynamite since the last deal.
+  bool _roundDirty = false;
+
+  /// Undo returns to the start of the current round (uses 1 undo charge).
   bool get canUndoPlacement =>
       status == GameStatus.playing &&
-      _undoSnapshot != null &&
+      _roundCheckpoint != null &&
+      _roundDirty &&
       inventory.undo.count > 0;
 
   static const clearBoardBonusBase = 250;
@@ -115,7 +181,8 @@ class GameController extends ChangeNotifier {
     lastScoreToast = null;
     pendingGemFlights = [];
     explodingCells = [];
-    _undoSnapshot = null;
+    _roundCheckpoint = null;
+    _roundDirty = false;
     stuckChoicePending = false;
     tileHistory = [];
     _seedBoard();
@@ -153,74 +220,109 @@ class GameController extends ChangeNotifier {
     TileTexture.currentIndex = tileIndex;
   }
 
+  /// Easier piece bags every 5 rounds, even at high difficulty.
+  bool get isEaseBreakRound => round > 1 && round % 5 == 0;
+
   void _dealTray() {
     tray = _dealSolvableTrio();
     piecesPlacedThisRound = 0;
-    _undoSnapshot = null;
+    _roundDirty = false;
+    _roundCheckpoint = _captureRoundCheckpoint();
     _checkGameOver();
   }
 
-  /// Deals a trio guaranteed (best effort) to have at least one sequential
-  /// solution from the current board, possibly requiring rope/dynamite the
-  /// player currently holds. Higher difficulty prefers deals with the fewest
-  /// solutions — ideally a single order-dependent sequence.
+  /// Deals a trio that is solvable with **no** rope/dynamite from the current
+  /// board. Retries with easier bags rather than shipping an unwinnable deal.
   List<TrayPiece?> _dealSolvableTrio() {
-    const attempts = 10;
+    const attempts = 48;
     const countCap = 24;
-    // (trio, rawSolutionCount) — raw counts ignore consumables; 0 means the
-    // deal is solvable only by spending rope/dynamite.
+    const nodeBudget = 90000;
     final candidates = <(List<TrayPiece>, int)>[];
+    final easeBreak = isEaseBreakRound;
 
-    List<TrayPiece>? fallback;
     for (var a = 0; a < attempts; a++) {
-      final trio = _pieces.dealTrio(difficultyLevel);
-      fallback ??= trio;
+      final DealBias bias;
+      final int level;
+      if (a >= 36) {
+        bias = DealBias.rescue;
+        level = 1;
+      } else if (easeBreak || a >= 20) {
+        bias = DealBias.easeBreak;
+        level = difficultyLevel;
+      } else if (a >= 12) {
+        bias = DealBias.normal;
+        level = (difficultyLevel - 2).clamp(1, 99);
+      } else {
+        bias = DealBias.normal;
+        level = difficultyLevel;
+      }
+
+      final trio = _pieces.dealTrio(level, bias: bias);
+      // Must be winnable without consumables — matches the common "no items"
+      // game-over case from playtests.
       final raw = PuzzleSolver.countSolutions(
         board,
         trio,
         limit: countCap,
-        nodeBudget: 60000,
+        nodeBudget: nodeBudget,
       );
       if (raw > 0) {
         candidates.add((trio, raw));
-        continue;
+        if (candidates.length >= 6 && a >= 8) break;
       }
-      final withItems = PuzzleSolver.isSolvable(
-        board,
-        trio,
-        ropeCharges: inventory.rope.count,
-        dynamiteCharges: inventory.dynamite.count,
-        nodeBudget: 60000,
-      );
-      if (withItems) candidates.add((trio, 0));
     }
 
     if (candidates.isEmpty) {
-      // No solvable deal found within budget; keep the first roll and let the
-      // normal game-over logic take it from here.
-      return [fallback![0], fallback[1], fallback[2]];
+      return _guaranteedPlaceableTrio();
     }
 
-    // Sort by raw count ascending, treating consumable-dependent deals (0) as
-    // the hardest tier.
-    candidates.sort((a, b) {
-      int rank(int raw) => raw == 0 ? -1 : raw;
-      return rank(a.$2).compareTo(rank(b.$2));
-    });
+    candidates.sort((a, b) => a.$2.compareTo(b.$2));
 
     List<TrayPiece> chosen;
-    if (difficultyLevel >= 6) {
-      // Hardest available: fewest solutions (single-solution when possible).
+    if (easeBreak || difficultyLevel <= 2) {
+      chosen = candidates.last.$1; // most forgiving
+    } else if (difficultyLevel >= 6) {
       chosen = candidates
           .firstWhere((c) => c.$2 == 1, orElse: () => candidates.first)
           .$1;
-    } else if (difficultyLevel >= 3) {
-      chosen = candidates[candidates.length ~/ 2].$1;
     } else {
-      // Early rounds: most forgiving deal.
-      chosen = candidates.last.$1;
+      chosen = candidates[candidates.length ~/ 2].$1;
     }
     return [chosen[0], chosen[1], chosen[2]];
+  }
+
+  /// Absolute fallback: smallest pieces that fit empty cells, never empty-handed.
+  List<TrayPiece?> _guaranteedPlaceableTrio() {
+    final empties = <Point<int>>[];
+    for (var r = 0; r < BoardLogic.size; r++) {
+      for (var c = 0; c < BoardLogic.size; c++) {
+        if (!board[r][c].filled) empties.add(Point(c, r));
+      }
+    }
+    final shapes = <PieceShape>[
+      PieceCatalog.monomino,
+      PieceCatalog.dominoH,
+      PieceCatalog.trominoI,
+    ];
+    // Prefer shapes that can place on the current board; fall back to mono.
+    final picked = <TrayPiece>[];
+    for (var i = 0; i < 3; i++) {
+      PieceShape shape = PieceCatalog.monomino;
+      for (final candidate in shapes) {
+        if (BoardLogic.canPlaceAnywhere(board, TrayPiece(id: 't', shape: candidate))) {
+          shape = candidate;
+          break;
+        }
+      }
+      if (empties.isEmpty) shape = PieceCatalog.monomino;
+      picked.add(
+        TrayPiece(
+          id: 'rescue_${DateTime.now().microsecondsSinceEpoch}_$i',
+          shape: shape,
+        ),
+      );
+    }
+    return [picked[0], picked[1], picked[2]];
   }
 
   /// Test hook: reseed the board at current difficulty and deal a new tray.
@@ -254,8 +356,8 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
-  PlacementSnapshot _captureSnapshot() {
-    return PlacementSnapshot(
+  RoundCheckpoint _captureRoundCheckpoint() {
+    return RoundCheckpoint(
       board: BoardLogic.cloneBoard(board),
       tray: tray.map((p) => p?.copy()).toList(),
       score: score,
@@ -266,12 +368,17 @@ class GameController extends ChangeNotifier {
         dynamite: inventory.dynamite.copy(),
         undo: inventory.undo.copy(),
       ),
+      round: round,
+      difficultyLevel: difficultyLevel,
+      tileIndex: tileIndex,
+      tileHistory: List<int>.from(tileHistory),
     );
   }
 
+  /// Restores the exact board/tray/loot/consumables from the start of the round.
   bool undoLastPlacement() {
     if (!canUndoPlacement) return false;
-    final snap = _undoSnapshot!;
+    final snap = _roundCheckpoint!;
     if (!inventory.undo.tryConsume()) return false;
 
     board = BoardLogic.cloneBoard(snap.board);
@@ -282,7 +389,13 @@ class GameController extends ChangeNotifier {
     score = snap.score;
     gemsCollectedTowardReset = snap.gemsCollectedTowardReset;
     piecesPlacedThisRound = snap.piecesPlacedThisRound;
-    // Restore meters except undo count (already consumed current).
+    round = snap.round;
+    difficultyLevel = snap.difficultyLevel;
+    tileIndex = snap.tileIndex;
+    tileHistory = List<int>.from(snap.tileHistory);
+    TileTexture.currentIndex = tileIndex;
+
+    // Restore meters except undo count/progress (charge already spent).
     final undoLeft = inventory.undo.count;
     final undoProgress = inventory.undo.progress;
     final undoThreshold = inventory.undo.threshold;
@@ -297,9 +410,9 @@ class GameController extends ChangeNotifier {
         tier: undoTier,
       ),
     );
-    _undoSnapshot = null;
+    _roundDirty = false;
     stuckChoicePending = false;
-    lastScoreToast = 'Undone';
+    lastScoreToast = 'Round undone';
     pendingGemFlights = [];
     explodingCells = [];
     _checkGameOver();
@@ -308,12 +421,26 @@ class GameController extends ChangeNotifier {
     return true;
   }
 
+  /// Test helper: mark the current state as the round checkpoint.
+  @visibleForTesting
+  void debugCaptureRoundCheckpoint({bool dirty = false}) {
+    _roundCheckpoint = _captureRoundCheckpoint();
+    _roundDirty = dirty;
+  }
+
+  @visibleForTesting
+  void debugClearRoundCheckpoint() {
+    _roundCheckpoint = null;
+    _roundDirty = false;
+  }
+
   bool applyRopeToPiece(int trayIndex) {
     if (status != GameStatus.playing) return false;
     final piece = tray[trayIndex];
     if (piece == null || piece.hasRope) return false;
     if (!inventory.rope.tryConsume()) return false;
     piece.hasRope = true;
+    _roundDirty = true;
     _checkGameOver();
     _persist();
     notifyListeners();
@@ -334,7 +461,7 @@ class GameController extends ChangeNotifier {
     if (piece == null) return false;
     if (!BoardLogic.canPlace(board, piece.shape, row, col)) return false;
 
-    _undoSnapshot = _captureSnapshot();
+    _roundDirty = true;
 
     BoardLogic.placePiece(board, piece.shape, row, col);
     tray[trayIndex] = null;
@@ -362,8 +489,7 @@ class GameController extends ChangeNotifier {
   bool useDynamite(int row, int col) {
     if (status != GameStatus.playing) return false;
     if (!inventory.dynamite.tryConsume()) return false;
-    // Dynamite is not undoable as a placement.
-    _undoSnapshot = null;
+    _roundDirty = true;
 
     final result = BoardLogic.clearDynamite(board, row, col);
     _handleClearResult(result);
@@ -454,7 +580,6 @@ class GameController extends ChangeNotifier {
       difficultyLevel++;
     }
     round++;
-    _undoSnapshot = null;
     _dealTray();
   }
 
@@ -487,7 +612,7 @@ class GameController extends ChangeNotifier {
     _startDisasterSequence();
   }
 
-  /// Player chose "Undo last move" in the stuck prompt.
+  /// Player chose "Undo round" in the stuck prompt.
   void resolveStuckWithUndo() {
     if (!stuckChoicePending) return;
     stuckChoicePending = false;
@@ -503,7 +628,7 @@ class GameController extends ChangeNotifier {
 
   Future<void> _startDisasterSequence() async {
     status = GameStatus.disaster;
-    _undoSnapshot = null;
+    _roundDirty = false;
     notifyListeners();
 
     await Future<void>.delayed(const Duration(milliseconds: 1100));
@@ -575,6 +700,8 @@ class GameController extends ChangeNotifier {
         'gemsCollectedTowardReset': gemsCollectedTowardReset,
         'tileIndex': tileIndex,
         'tileHistory': tileHistory,
+        'roundDirty': _roundDirty,
+        'roundCheckpoint': _roundCheckpoint?.toJson(),
         'status': GameStatus.playing.name,
       };
 
@@ -605,6 +732,16 @@ class GameController extends ChangeNotifier {
     ];
     TileTexture.currentIndex = tileIndex;
     status = GameStatus.playing;
-    _undoSnapshot = null;
+    _roundDirty = json['roundDirty'] as bool? ?? piecesPlacedThisRound > 0;
+    final rawCheckpoint = json['roundCheckpoint'];
+    if (rawCheckpoint is Map) {
+      _roundCheckpoint = RoundCheckpoint.fromJson(
+        Map<String, dynamic>.from(rawCheckpoint),
+      );
+    } else {
+      // Older saves: no checkpoint — undo unavailable until the next deal.
+      _roundCheckpoint = null;
+      _roundDirty = false;
+    }
   }
 }

@@ -6,7 +6,6 @@ import 'package:boomblocks/systems/board_logic.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Storage that never touches prefs disk beyond the mock.
 class _TestStorage extends GameStorage {}
 
 void main() {
@@ -26,8 +25,7 @@ void main() {
     }
   }
 
-  /// Places a monomino into one of the scattered holes, leaving a square3
-  /// that fits nowhere. No lines clear (every row/col keeps ≥1 hole).
+  /// Places a monomino into a hole, leaving a square3 that fits nowhere.
   GameController stuckAfterPlacement({int dynamite = 0}) {
     final c = GameController(storage: _TestStorage());
     c.newGame();
@@ -42,16 +40,17 @@ void main() {
       dynamite: ItemMeter(count: dynamite, threshold: 65),
       undo: ItemMeter(count: 1, threshold: 80),
     );
+    // Checkpoint must match the stuck setup (not the earlier newGame deal).
+    c.debugCaptureRoundCheckpoint(dirty: false);
     expect(c.placePiece(0, 0, 0), isTrue);
     return c;
   }
 
-  test('unused undo charge does not prevent game over when nothing fits',
+  test('without a round checkpoint, undo charges cannot soft-lock a loss',
       () async {
     final c = GameController(storage: _TestStorage());
     c.newGame();
 
-    // Fill entire board so nothing can be placed.
     c.board = BoardLogic.emptyBoard();
     for (var r = 0; r < BoardLogic.size; r++) {
       for (var col = 0; col < BoardLogic.size; col++) {
@@ -68,10 +67,9 @@ void main() {
       dynamite: ItemMeter(count: 0, threshold: 65),
       undo: ItemMeter(count: 1, threshold: 80),
     );
-    // No placement snapshot → undo is unusable.
+    c.debugClearRoundCheckpoint();
     expect(c.canUndoPlacement, isFalse);
 
-    // applyRopeToPiece re-runs the game-over check after consuming the rope.
     final applied = c.applyRopeToPiece(0);
     expect(applied, isTrue);
     expect(c.canUndoPlacement, isFalse);
@@ -90,16 +88,18 @@ void main() {
     expect(c.tray.whereType<TrayPiece>().length, 1);
   });
 
-  test('stuck prompt: undo restores the last move and clears the prompt', () {
+  test('stuck prompt: undo restores the round start and clears the prompt', () {
     final c = stuckAfterPlacement();
     expect(c.stuckChoicePending, isTrue);
     c.resolveStuckWithUndo();
     expect(c.stuckChoicePending, isFalse);
     expect(c.status, GameStatus.playing);
     expect(c.inventory.undo.count, 0);
-    // Board restored: the hole is free again and the monomino is back.
+    // Round start restored: hole free, both pieces back, dirty cleared.
     expect(c.board[0][0].filled, isFalse);
     expect(c.tray.whereType<TrayPiece>().length, 2);
+    expect(c.canUndoPlacement, isFalse);
+    expect(c.piecesPlacedThisRound, 0);
   });
 
   test('stuck prompt: end game starts the disaster sequence', () {
@@ -117,8 +117,42 @@ void main() {
 
   test('no stuck prompt while dynamite remains', () {
     final c = stuckAfterPlacement(dynamite: 1);
-    // Dynamite can still open space → no forced choice.
     expect(c.stuckChoicePending, isFalse);
     expect(c.status, GameStatus.playing);
+  });
+
+  test('undo restores loot counter and consumable meters from round start', () {
+    final c = GameController(storage: _TestStorage());
+    c.newGame();
+    c.score = 100;
+    c.gemsCollectedTowardReset = 3;
+    c.inventory = Inventory(
+      rope: ItemMeter(count: 2, progress: 10, threshold: 50),
+      dynamite: ItemMeter(count: 1, progress: 20, threshold: 65),
+      undo: ItemMeter(count: 2, progress: 5, threshold: 80),
+    );
+    c.tray = [
+      TrayPiece(id: 'a', shape: PieceCatalog.monomino),
+      TrayPiece(id: 'b', shape: PieceCatalog.dominoH),
+      TrayPiece(id: 'c', shape: PieceCatalog.trominoI),
+    ];
+    c.debugCaptureRoundCheckpoint(dirty: false);
+
+    expect(c.placePiece(0, 0, 0), isTrue);
+    expect(c.gemsCollectedTowardReset, 3);
+    expect(c.canUndoPlacement, isTrue);
+
+    // Spend rope mid-round; undo should restore the pre-spend meter.
+    expect(c.applyRopeToPiece(1), isTrue);
+    expect(c.inventory.rope.count, 1);
+
+    expect(c.undoLastPlacement(), isTrue);
+    expect(c.inventory.rope.count, 2);
+    expect(c.inventory.dynamite.count, 1);
+    expect(c.inventory.undo.count, 1); // one charge spent
+    expect(c.gemsCollectedTowardReset, 3);
+    expect(c.score, 100);
+    expect(c.tray.whereType<TrayPiece>().length, 3);
+    expect(c.piecesPlacedThisRound, 0);
   });
 }
