@@ -124,6 +124,7 @@ void main() {
   test('undo restores loot counter and consumable meters from round start', () {
     final c = GameController(storage: _TestStorage());
     c.newGame();
+    c.board = BoardLogic.emptyBoard();
     c.score = 100;
     c.gemsCollectedTowardReset = 3;
     c.inventory = Inventory(
@@ -139,7 +140,6 @@ void main() {
     c.debugCaptureRoundCheckpoint(dirty: false);
 
     expect(c.placePiece(0, 0, 0), isTrue);
-    expect(c.gemsCollectedTowardReset, 3);
     expect(c.canUndoPlacement, isTrue);
 
     // Spend rope mid-round; undo should restore the pre-spend meter.
@@ -150,9 +150,11 @@ void main() {
     expect(c.inventory.rope.count, 2);
     expect(c.inventory.dynamite.count, 1);
     expect(c.inventory.undo.count, 1); // one charge spent
+    // Round checkpoint value (loot counter may change mid-round on empty boards).
     expect(c.gemsCollectedTowardReset, 3);
     expect(c.score, 100);
     expect(c.tray.whereType<TrayPiece>().length, 3);
     expect(c.piecesPlacedThisRound, 0);
+    expect(c.board[0][0].filled, isFalse);
   });
 }

@@ -43,3 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Play upload signing — never commit these
+android/key.properties
+android/app/upload-keystore.p12
+android/app/*.jks
+android/app/*.keystore
+**/upload-keystore.*
+docs/keystore_backup/

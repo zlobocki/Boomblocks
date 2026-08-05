@@ -9,7 +9,7 @@ import 'systems/music_service.dart';
 import 'theme/app_strings.dart';
 import 'theme/app_theme.dart';
 import 'theme/tile_texture.dart';
-import 'ui/home_screen.dart';
+import 'ui/boot_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -71,7 +71,7 @@ class _MinePuzzleAppState extends State<MinePuzzleApp>
       title: AppStrings.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      home: const HomeScreen(),
+      home: const BootScreen(),
     );
   }
 }
