@@ -16,7 +16,7 @@ if (hasReleaseKeystore) {
 }
 
 android {
-    namespace = "com.boomblocks.boomblocks"
+    namespace = "eu.zbigniew_lobocki.gra"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
 
@@ -30,7 +30,8 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.boomblocks.boomblocks"
+        // Must match the package name registered in Google Play Console.
+        applicationId = "eu.zbigniew_lobocki.gra"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

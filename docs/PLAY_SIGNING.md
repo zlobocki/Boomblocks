@@ -41,7 +41,7 @@ Output: `build/app/outputs/bundle/release/app-release.aab`
 
 ## Package details
 
-- Application id: `com.boomblocks.boomblocks`
+- Application id: `eu.zbigniew_lobocki.gra`
 - Display name: Mine Puzzle
 - Developer: Zbigniew Łobocki
 - Privacy policy URL (after GitHub Pages is on):  
